@@ -64,14 +64,24 @@ and Windows NT machines.
 
 AVAILABILITY
 
-The latest version of this package is available for download from a
-CPAN (Comprehensive Perl Archive Network) site near your at
+The latest released version of this package is available for download
+from a CPAN (Comprehensive Perl Archive Network) archive near you in
 
     http://www.perl.com/CPAN/authors/id/B/BZ/BZAJAC/
 
-or from my FTP site:
+The latest beta version of this package is hosted in a Subversion
+repository located at
 
-    ftp://ftp.gps.caltech.edu/pub/blair/Perl/
+    http://svn.orcaware.com:8000/repos/trunk/perl_webfs_filecopy/
+
+Subversion is an open-source source code management system designed to
+replace CVS.  To get Subversion, see
+
+    http://subversion.tigris.org/
+
+and for an overview of Subversion, see
+
+    http://www.orcaware.com/svn/Subversion-Blair_Zajac.ppt
 
 INSTALLATION
 
