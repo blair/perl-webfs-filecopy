@@ -1,4 +1,4 @@
-Package WebFS::FileCopy version 0.02
+Package WebFS::FileCopy version 0.03
 
 This is the WebFS::FileCopy package.  This module provides subroutines
 for the getting, putting, copying, moving and deleting of files located
@@ -34,22 +34,32 @@ REQUIREMENTS
 
    * Perl 5.004_04 or greater.
 
-   * LWPng-alpha-0.21 or greater.
+   * LWPng-alpha-0.23 or greater.
 
    * Net::FTP.
 
+SUPPORTED PLATFORMS
+
+I have built and tested the WebFS::FileCopy package on both Solaris
+and Windows NT machines.
+
 AVAILABILITY
 
-The latest version of this package is available from a CPAN
-archive near you in CPAN/authors/id/B/BZ/BZAJAC/WebFS-FileCopy-0.02.tar.gz
-or from the author by contacting Blair Zajac <blair@gps.caltech.edu>.
+The latest version of this package is available for download from a CPAN
+(Comprehensive Perl Archive Network) site near your at
+
+	http://www.perl.com/CPAN/authors/id/B/BZ/BZAJAC/
+
+or from my FTP site:
+
+	ftp://ftp.gps.caltech.edu/pub/blair/Perl/
 
 INSTALLATION
 
 In order to use this package you will need Perl version 5.004_04 or
 better.
 
-You will need a LWPng-alpha version 0.21 or greater.  Versions older
+You will need a LWPng-alpha version 0.23 or greater.  Versions older
 than this one will not work with WebFS::FileCopy.  Get LWPng-alpha
 from CPAN as CPAN/authors/id/GAAS/LWPng-alpha-?.??.tar.gz.
 

@@ -9,7 +9,7 @@ require WebFS::FileCopy::Put::FTP;
 
 use vars qw($VERSION @ISA);
 
-$VERSION = do {my @r=(q$Revision: 0.01 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = do {my @r=(q$Revision: 0.03 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
 @ISA     = qw(Exporter); 
  
 sub new { 
@@ -21,13 +21,13 @@ sub new {
     return;
   }
 
-  # We put this in so that gen_response can be used.
+  # We put this in so that give_response can be used.
   $req->{done_cb} = sub { $_[0]; };
 
   # Check that we have a URL.
   my $url = $req->url;
   unless ($url) {
-    $@ = $req->gen_response(400, 'Missing URL in request');
+    $@ = $req->give_response(400, 'Missing URL in request');
     return;
   }
 
@@ -39,8 +39,8 @@ sub new {
     WebFS::FileCopy::Put::File->new($req);
   }
   else {
-    $@ = $req->gen_response(500,
-			    "WebFS::FileCopy::Put invalid scheme $scheme");
+    $@ = $req->give_response(500,
+			     "WebFS::FileCopy::Put invalid scheme $scheme");
     return; 
   } 
 } 
@@ -109,8 +109,8 @@ Blair Zajac <blair@gps.caltech.edu>
 
 =head1 COPYRIGHT
 
-Copyright (c) 1998 Blair Zajac. All rights reserved.  This package is
-free software; you can redistribute it and/or modify it under the same
+Copyright (c) 1998 by Blair Zajac.  All rights reserved.  This package
+is free software; you can redistribute it and/or modify it under the same
 terms as Perl itself.
 
 =cut

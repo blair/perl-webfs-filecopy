@@ -8,7 +8,7 @@ use Carp qw(cluck);
 
 use vars qw($VERSION @ISA);
 
-$VERSION = do {my @r=(q$Revision: 0.01 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = do {my @r=(q$Revision: 0.03 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
 @ISA     = qw(Exporter);
 
 sub new {
@@ -19,21 +19,21 @@ sub new {
 
   my $scheme = $url->scheme;
   unless ($scheme eq 'file') {
-    $@ = $req->gen_response(500,
-			    "WebFS::FileCopy::Put::File invalid scheme $scheme");
+    $@ = $req->give_response(500,
+			     "WebFS::FileCopy::Put::File invalid scheme $scheme");
     return;
   }
 
   my $host = $url->host;
   if ($host and $host !~ /^localhost$/i) {
-    $@ = $req->gen_response(400, 'Only file://localhost/ allowed');
+    $@ = $req->give_response(400, 'Only file://localhost/ allowed');
     return;
   }
 
   # Open the file.
   local *FH;
   open(FH, '>' . $url->local_path) or do {
-    $@ = $req->gen_response(401, "$!");
+    $@ = $req->give_response(401, "$!");
     return;
   };
 
@@ -54,7 +54,7 @@ sub close {
   my $self = shift;
 
   my $ret = close($self->{handle});
-  $self->{req}->gen_response($ret ? 201 : 500);
+  $self->{req}->give_response($ret ? 201 : 500);
 }
 
 1;

@@ -6,34 +6,26 @@ use strict;
 use Exporter;
 use Carp qw(croak cluck);
 use Cwd;
-use LWP::Version 0.21;
+use LWP::Version 0.23;
 use LWP::UA;
 use LWP::MainLoop qw(mainloop);
+use LWP::Conn::HTTP;
+use LWP::Request;
 use HTTP::Request::Common qw(GET PUT);
 use Net::FTP;
-require LWP::Version;
-require LWP::Conn::HTTP;
-require LWP::Request;
-require WebFS::FileCopy::Put;
+use WebFS::FileCopy::Put;
 
 use vars qw($VERSION @ISA @EXPORT $ua);
 
-$VERSION = do {my @r=(q$Revision: 0.02 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = do {my @r=(q$Revision: 0.03 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
 @ISA     = qw(Exporter);
 @EXPORT  = qw(&copy_url &copy_urls &delete_urls &get_urls &list_url
 	      &move_url &put_urls);
 
-# Make sure that we have version 0.21 or greater of LWP::Version from
-# LWPng.
-BEGIN {
-  if ($LWP::Version::VERSION < 0.21) {
-    Carp::croak("WebFS::FileCopy requires LWP::Version version 0.21 or greater\n");
-  }
-}
-
-package LWP::UA;
-use Carp qw(cluck);
+package WebFS::FileCopy::UA;
+use base 'LWP::UA';
 use LWP::MainLoop qw(mainloop);
+use Carp qw(cluck);
 sub _start_read_request {
   my ($self, $req) = @_;
 
@@ -53,7 +45,7 @@ sub _start_read_request {
 
   mainloop->one_event until $res || mainloop->empty;
 
-  bless $res, 'LWP::Response';
+  bless $res, 'WebFS::FileCopy::Response';
 }
 
 sub _start_transfer_request {
@@ -135,7 +127,7 @@ sub _start_transfer_request {
   $get_res;
 }
 
-package LWP::Response;
+package WebFS::FileCopy::Response;
 use base 'HTTP::Response';
 use LWP::MainLoop qw(mainloop);
 
@@ -160,7 +152,7 @@ package WebFS::FileCopy;
 
 sub _init_ua {
   # Create a global UserAgent object.
-  $ua = LWP::UA->new ;
+  $ua = WebFS::FileCopy::UA->new;
   $ua->env_proxy;
 }
 
@@ -270,14 +262,14 @@ sub put_urls {
   foreach my $url (@urls) {
     my $put_req = LWP::Request->new('PUT' => $url);
 
-    # We put this in so that gen_response can be used.
+    # We put this in so that give_response can be used.
     $put_req->{done_cb} = sub { $_[0]; };
 
     # Need a valid URL.
     unless ($url) {
       push(@put_req, 0);
       push(@put_res,
-        $put_req->gen_response(400, 'Missing URL in request'));
+        $put_req->give_response(400, 'Missing URL in request'));
       next;
     }
 
@@ -285,7 +277,7 @@ sub put_urls {
     if (_is_directory($url)) {
       push(@put_req, 0);
       push(@put_res,
-        $put_req->gen_response(403, 'URL cannot be a directory'));
+        $put_req->give_response(403, 'URL cannot be a directory'));
       next;
     }
 
@@ -294,13 +286,13 @@ sub put_urls {
     unless ($scheme && ($scheme eq 'ftp' or $scheme eq 'file')) {
       push(@put_req, 0);
       push(@put_res,
-        $put_req->gen_response(400, "Invalid scheme $scheme"));
+        $put_req->give_response(400, "Invalid scheme $scheme"));
       next;
     }
 
     # We now have a valid request.
     push(@put_req, $put_req);
-    push(@put_res, $put_req->gen_response(201));
+    push(@put_res, $put_req->give_response(201));
     $leave_now = 0;
   }
 
@@ -426,7 +418,7 @@ sub copy_urls {
     # If the from URL is empty, then generate a missing URL response.
     unless ($from) {
       $get_req->{done_cb} = sub { $_[0]; };
-      push(@get_res, $get_req->gen_response(400, 'Missing URL in request'));
+      push(@get_res, $get_req->give_response(400, 'Missing URL in request'));
       next;
     }
 
@@ -734,7 +726,7 @@ sub _open_ftp_connection {
   my $url = $req->url;
   unless ($url->scheme eq 'ftp') {
     cluck "Use a FTP URL";
-    $@ = $req->gen_response(400, "Use a FTP URL");
+    $@ = $req->give_response(400, "Use a FTP URL");
     return;
   }
 
@@ -748,14 +740,14 @@ sub _open_ftp_connection {
   my $ftp = Net::FTP->new($url->host);
   unless ($ftp) {
     $@ =~ s/^Net::FTP: //;
-    $@ = $req->gen_response(500, $@);
+    $@ = $req->give_response(500, $@);
     return;
   }
 
   # Try to log in.
   unless ($ftp->login($user, $pass, $acct)) {
     # Unauthorized access.  Fake a RC_UNAUTHORIZED response.
-    $@ = $req->gen_response(401, $ftp->message);
+    $@ = $req->give_response(401, $ftp->message);
     $@->header("WWW-Authenticate", qq(Basic Realm="FTP login"));
     return;
   }
@@ -996,8 +988,8 @@ Blair Zajac <blair@gps.caltech.edu>
 
 =head1 COPYRIGHT
 
-Copyright (c) 1998 Blair Zajac. All rights reserved.  This package is
-free software; you can redistribute it and/or modify it under the same
+Copyright (c) 1998 by Blair Zajac.  All rights reserved.  This package
+is free software; you can redistribute it and/or modify it under the same
 terms as Perl itself.
 
 =cut

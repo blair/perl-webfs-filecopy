@@ -9,7 +9,7 @@ use Net::FTP;
 
 use vars qw($VERSION @ISA);
 
-$VERSION = do {my @r=(q$Revision: 0.01 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = do {my @r=(q$Revision: 0.03 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
 @ISA     = qw(Exporter);
 
 sub new {
@@ -27,21 +27,21 @@ sub new {
   pop(@path) while @path && $path[-1] eq '';
   my $remote_file = pop(@path);
   unless ($remote_file) {
-    $@ = $req->gen_response(500, "No remote file specified");
+    $@ = $req->give_response(500, "No remote file specified");
     return;
   }
 
   # Change directories.
   foreach my $dir (@path) {
     unless ($ftp->cwd($dir)) {
-      $@ = $req->gen_response(404, "Cannot chdir to `$dir'");
+      $@ = $req->give_response(404, "Cannot chdir to `$dir'");
       return;
     }
   }
 
   my $data = $ftp->stor($url->path);
   unless ($data) {
-    $@ = $req->gen_response(400, "FTP return code " . $ftp->code);
+    $@ = $req->give_response(400, "FTP return code " . $ftp->code);
     $@->content_type('text/plain');
     $@->content($ftp->message);
     return;
@@ -64,7 +64,7 @@ sub close {
 
   my $ret = $self->{data}->close;
   $self->{ftp}->quit;
-  $self->{req}->gen_response($ret ? 201 : 500);
+  $self->{req}->give_response($ret ? 201 : 500);
 }
 
 1;
