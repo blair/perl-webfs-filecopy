@@ -4,27 +4,32 @@
 use strict;
 use vars qw($loaded);
 
-BEGIN { $| = 1; print "1..127\n"; }
+BEGIN { $| = 1; print "1..179\n"; }
 END   { print "not ok 1\n" unless $loaded; }
 
 my $ok_count = 1;
 sub ok {
-  shift or print "not ";
+  my $ok = shift;
+  $ok or print "not ";
   print "ok $ok_count\n";
   ++$ok_count;
+  $ok;
 }
 
+use URI;
 use WebFS::FileCopy;
+use Data::Dumper;
 use Cwd;
+use LWP::StdSched;
 
-if (1) {
-#  $LWP::UA::DEBUG = 10;
-#  $LWP::EventLoop::DEBUG = 10;
-#  $LWP::Server::DEBUG = 10;
-#  $LWP::Conn::FTP::DEBUG = 10;
-#  $LWP::Conn::HTTP::DEBUG = 10;
-#  $LWP::Conn::_Connect::DEBUG = 10;
-#  $LWP::StdSched::DEBUG = 10;
+if (0) {
+  $LWP::UA::DEBUG = 10;
+  $LWP::EventLoop::DEBUG = 10;
+  $LWP::Server::DEBUG = 10;
+  $LWP::Conn::FTP::DEBUG = 10;
+  $LWP::Conn::HTTP::DEBUG = 10;
+  $LWP::Conn::_Connect::DEBUG = 10;
+  $LWP::StdSched::DEBUG = 10;
 }
 
 # If we got here, then the package being tested was loaded.
@@ -38,7 +43,7 @@ chdir 't' if -d 't';
 ok(  WebFS::FileCopy::_is_directory('http://www.gps.caltech.edu') );	#  2
 ok( !WebFS::FileCopy::_is_directory('http://www/fff') );		#  3
 ok(  WebFS::FileCopy::_is_directory('http://www.gps.caltech.edu/~blair/') );# 4
-ok( !WebFS::FileCopy::_is_directory(URI::URL->newlocal('file1')) );	#  5
+ok( !WebFS::FileCopy::_is_directory(URI::file->new_abs('file1')) );	#  5
 
 # Check illegal argument passing to copy_urls.
 
@@ -58,43 +63,55 @@ ok( $@ eq 'Can only copy to file or FTP URLs: http://ftp/' );		# 11
 # file 4 doesn't.
 my $cwd = cwd;
 my @from_files = qw(file1 file2 file3 file4 file5);
-my @from_urls = map { URI::URL->newlocal($_) } @from_files;
-my @to_urls = map { WebFS::FileCopy::_fix_url("$_.new") } @from_urls;
+my @from_urls  = map { URI::file->new_abs($_) } @from_files;
+my @to_urls    = map { WebFS::FileCopy::_fix_url("$_.new") } @from_urls;
 
 # Clean up any output files from previous testing runs.
-unlink(map { $_->local_path } @to_urls);
+unlink(map { $_->file } @to_urls);
 
 # Test the get_urls.
-my  @a =  get_urls(@from_urls);
-ok( @a == @from_files );						# 12
+my @a = get_urls(@from_urls);
 
-ok(  $a[0]->is_success and length($a[0]->content) == 90 );		# 13
-ok(  $a[1]->is_success and length($a[1]->content) == 501 );		# 14
-ok(  $a[2]->is_success and length($a[2]->content) == 365 );		# 15
-ok( !$a[3]->is_success );						# 16
-ok(  $a[4]->is_success and length($a[4]->content) == 11683 );		# 17
+ok( @a == @from_urls );							# 12
+ok( $a[0] );								# 13
+ok( $a[1] );								# 14
+ok( $a[2] );								# 15
+ok( $a[3] );								# 16
+ok( $a[4] );								# 17
+
+ok(  $a[0]->is_success and length($a[0]->content) ==  90 );		# 18
+ok(  $a[1]->is_success and length($a[1]->content) == 501 );		# 19
+ok(  $a[2]->is_success and length($a[2]->content) == 365 );		# 20
+ok( !$a[3]->is_success );						# 21
+ok(  $a[4]->is_success and length($a[4]->content) == 11683 );		# 22
 
 # Try to put the files.
 my $content = $a[4]->content;
 my @b = put_urls($content, @to_urls, 'file:/this/path/should/not/exist');
-ok(  @b == @from_files+1 );						# 18
-ok(  $b[0]->is_success );						# 19
-ok(  $b[1]->is_success );						# 20
-ok(  $b[2]->is_success );						# 21
-ok(  $b[3]->is_success );						# 22
-ok(  $b[4]->is_success );						# 23
-ok( !$b[5]->is_success );						# 24
-ok(  $b[5]->message eq "No such file or directory" );			# 25
+ok(  @b == @from_files+1 );						# 23
+ok(  $b[0] );								# 24
+ok(  $b[1] );								# 25
+ok(  $b[2] );								# 26
+ok(  $b[3] );								# 27
+ok(  $b[4] );								# 28
+ok(  $b[5] );								# 29
+ok(  $b[0]->is_success );						# 30
+ok(  $b[1]->is_success );						# 31
+ok(  $b[2]->is_success );						# 32
+ok(  $b[3]->is_success );						# 33
+ok(  $b[4]->is_success );						# 34
+ok( !$b[5]->is_success );						# 35
+ok(  $b[5]->message eq "No such file or directory" );			# 36
 
 # Try to get the same files we just put.
 my @c = get_urls(@to_urls);
-#print Data::Dumper::Dumper(@c);
-ok( @c == @from_files );						# 26
-ok( $a[4]->content eq $c[0]->content );					# 27
-ok( $a[4]->content eq $c[1]->content );					# 28
-ok( $a[4]->content eq $c[2]->content );					# 29
-ok( $a[4]->content eq $c[3]->content );					# 30
-ok( $a[4]->content eq $c[4]->content );					# 31
+ok( @c == @from_files );						# 37
+ok( $a[4] );								# 38
+ok( $a[4]->content eq $c[0]->content );					# 39
+ok( $a[4]->content eq $c[1]->content );					# 40
+ok( $a[4]->content eq $c[2]->content );					# 41
+ok( $a[4]->content eq $c[3]->content );					# 42
+ok( $a[4]->content eq $c[4]->content );					# 43
 
 # Test the subroutine form of put_urls.
 my $i = 0;
@@ -105,23 +122,35 @@ sub put_test {
 }
 
 @b = put_urls(\&put_test, 'file:/this/path/should/not/exist', @to_urls);
-ok( @b == @from_files+1 );						# 32
-ok( !$b[0]->is_success );						# 33
-ok(  $b[0]->message eq "No such file or directory" );			# 34
-ok(  $b[1]->is_success );						# 35
-ok(  $b[2]->is_success );						# 36
-ok(  $b[3]->is_success );						# 37
-ok(  $b[4]->is_success );						# 38
-ok(  $b[5]->is_success );						# 39
+ok( @b == @from_files+1 );						# 44
+ok(  $b[0] );								# 45
+ok(  $b[1] );								# 46
+ok(  $b[2] );								# 47
+ok(  $b[3] );								# 48
+ok(  $b[4] );								# 49
+ok(  $b[5] );								# 50
+ok( !$b[0]->is_success );						# 51
+ok(  $b[0]->message eq "No such file or directory" );			# 52
+ok(  $b[1]->is_success );						# 53
+ok(  $b[2]->is_success );						# 54
+ok(  $b[3]->is_success );						# 55
+ok(  $b[4]->is_success );						# 56
+ok(  $b[5]->is_success );						# 57
 
 # Try to get the same files we just put.
 @b = get_urls(@to_urls);
-ok( @b == @from_files );						# 40
-ok( $a[2]->content eq $b[0]->content );					# 41
-ok( $a[2]->content eq $b[1]->content );					# 42
-ok( $a[2]->content eq $b[2]->content );					# 43
-ok( $a[2]->content eq $b[3]->content );					# 44
-ok( $a[2]->content eq $b[4]->content );					# 45
+ok( @b == @from_files );						# 58
+ok( $a[2] );								# 59
+ok( $b[0] );								# 60
+ok( $b[1] );								# 61
+ok( $b[2] );								# 62
+ok( $b[3] );								# 63
+ok( $b[4] );								# 64
+ok( $a[2]->content eq $b[0]->content );					# 65
+ok( $a[2]->content eq $b[1]->content );					# 66
+ok( $a[2]->content eq $b[2]->content );					# 67
+ok( $a[2]->content eq $b[3]->content );					# 68
+ok( $a[2]->content eq $b[4]->content );					# 69
 
 # Try to get many different failures from put_urls.
 @b = put_urls('text',
@@ -129,14 +158,18 @@ ok( $a[2]->content eq $b[4]->content );					# 45
 	'file://some.other.host/test',
 	'ftp://ftp.gps.caltech.edu/test',
         '');
-ok( !$b[0]->is_success );						# 46
-ok(  $b[0]->message eq 'Invalid scheme http' );				# 47
-ok( !$b[1]->is_success );						# 48
-ok(  $b[1]->message eq "Only file://localhost/ allowed" );		# 49
-ok( !$b[2]->is_success );						# 50
-ok(  $b[2]->message eq "FTP return code 553" );				# 51
-ok( !$b[3]->is_success );						# 52
-ok(  $b[3]->message eq "Missing URL in request" );			# 53
+ok(  $b[0] );								# 70
+ok(  $b[1] );								# 71
+ok(  $b[2] );								# 72
+ok(  $b[3] );								# 73
+ok( !$b[0]->is_success );						# 74
+ok(  $b[0]->message eq 'Invalid scheme http' );				# 75
+ok( !$b[1]->is_success );						# 76
+ok(  $b[1]->message eq "Only file://localhost/ allowed" );		# 77
+ok( !$b[2]->is_success );						# 78
+ok(  $b[2]->message eq "FTP return code 553" );				# 79
+ok( !$b[3]->is_success );						# 80
+ok(  $b[3]->message eq "Missing URL in request" );			# 81
 
 # Try to delete some nonexistent files.
 @b = delete_urls(
@@ -144,118 +177,141 @@ ok(  $b[3]->message eq "Missing URL in request" );			# 53
 	'file://some.other.host/test',
 	'ftp://ftp.gps.caltech.edu/test',
         '');
-ok( !$b[0]->is_success );						# 54
-ok(  $b[0]->message eq "File Not Found" );				# 55
-ok( !$b[1]->is_success );						# 56
-ok(  $b[1]->message eq "Use ftp instead" );				# 57
-ok( !$b[2]->is_success );						# 58
-ok(  $b[2]->message eq "/test: Permission denied. (Delete)" );		# 59
-use Data::Dumper;
+ok( $b[0] );								# 82
+ok( $b[1] );								# 83
+ok( $b[2] );								# 84
+ok( !$b[0]->is_success );						# 85
+ok(  $b[0]->message eq "File Not Found" );				# 86
+ok( !$b[1]->is_success );						# 87
+ok(  $b[1]->message eq "Use ftp instead" );				# 88
+ok( !$b[2]->is_success );						# 89
+ok(  $b[2]->message eq "/test: Permission denied. (Delete)" );		# 90
 #print STDERR Dumper($b[2]), "\n";
 #print STDERR $b[2]->message, "\n";
-ok( !$b[3]->is_success );						# 60
-ok(  $b[3]->message eq "Missing URL in request" );			# 61
+ok( !$b[3]->is_success );						# 91
+ok(  $b[3]->message eq "Missing URL in request" );			# 92
 
 # Try to delete the files we created.
 @b = delete_urls(@to_urls);
-ok( $b[0]->is_success );						# 62
-ok( $b[1]->is_success );						# 63
-ok( $b[2]->is_success );						# 64
-ok( $b[3]->is_success );						# 65
-ok( $b[4]->is_success );						# 66
+ok( @b == @to_urls );							# 93
+ok( $b[0] );								# 94
+ok( $b[1] );								# 95
+ok( $b[2] );								# 96
+ok( $b[3] );								# 97
+ok( $b[4] );								# 98
+ok( $b[0]->is_success );						# 99
+ok( $b[1]->is_success );						# 100
+ok( $b[2]->is_success );						# 101
+ok( $b[3]->is_success );						# 102
+ok( $b[4]->is_success );						# 103
 
 # Try to delete the files again.  This time it should fail.
 @b = delete_urls(@to_urls);
-ok( !$b[0]->is_success );						# 67
-ok( !$b[1]->is_success );						# 68
-ok( !$b[2]->is_success );						# 69
-ok( !$b[3]->is_success );						# 70
-ok( !$b[4]->is_success );						# 71
+ok(  @b == @to_urls );							# 104
+ok(  $b[0] );								# 105
+ok(  $b[1] );								# 106
+ok(  $b[2] );								# 107
+ok(  $b[3] );								# 108
+ok(  $b[4] );								# 109
+ok( !$b[0]->is_success );						# 110
+ok( !$b[1]->is_success );						# 111
+ok( !$b[2]->is_success );						# 112
+ok( !$b[3]->is_success );						# 113
+ok( !$b[4]->is_success );						# 114
 
 # Create one file and try to move it.
-ok( copy_url($from_urls[4], $to_urls[4]) );				# 72
-ok( move_url($to_urls[4], $to_urls[0]) );				# 73
+ok( copy_url($from_urls[4], $to_urls[4]) );				# 115
+ok( move_url($to_urls[4], $to_urls[0]) );				# 116
 
 # Now try failures of move_url.
-ok( !move_url($to_urls[4], $to_urls[0]) );				# 74
-ok( $@ =~ m?/t/file5.new: No such file or directory? );			# 75
-ok( !move_url($to_urls[0], 'file://some.other.host/test') );		# 76
-ok( $@ eq 'PUT file://some.other.host/test: Only file://localhost/ allowed' ); # 76
+ok( !move_url($to_urls[4], $to_urls[0]) );				# 117
+ok( $@ =~ m?/t/file5.new: No such file or directory? );			# 118
+ok( !move_url($to_urls[0], 'file://some.other.host/test') );		# 119
+ok( $@ eq 'PUT file://some.other.host/test: Only file://localhost/ allowed' ); # 120
 
 # Make sure that if empty URLs are passed, we get the proper return message.
-ok( !copy_url(' ', ' ') );						# 78
-ok( $@ eq 'Missing GET URL' );						# 79
-ok( !copy_url('http://www.perl.com/', ' ') );				# 80
-ok( $@ eq 'Missing PUT URL' );						# 81
+ok( !copy_url(' ', ' ') );						# 121
+ok( $@ eq 'Missing GET URL' );						# 122
+ok( !copy_url('http://www.perl.com/', ' ') );				# 123
+ok( $@ eq 'Missing PUT URL' );						# 124
 
-ok( !copy_urls([], []) );						# 82
-ok( $@ eq 'No non-empty GET URLs' );					# 83
-ok( !copy_urls('http://www.perl.com/', []) );				# 84
-ok( $@ eq 'No non-empty PUT URLs' );					# 85
+ok( !copy_urls([], []) );						# 125
+ok( $@ eq 'No non-empty GET URLs' );					# 126
+ok( !copy_urls('http://www.perl.com/', []) );				# 127
+ok( $@ eq 'No non-empty PUT URLs' );					# 128
 
 @b = delete_urls(' ');
-ok( !$b[0]->is_success );						# 86
-ok(  $b[0]->message eq 'Missing URL in request' );			# 87
+ok(  $b[0] );								# 129
+ok( !$b[0]->is_success );						# 130
+ok(  $b[0]->message eq 'Missing URL in request' );			# 131
 
 @b = get_urls(' ');
-ok( !$b[0]->is_success );						# 88
-ok(  $b[0]->message eq 'Missing URL in request' );			# 89
+ok(  $b[0] );								# 132
+ok( !$b[0]->is_success );						# 133
+ok(  $b[0]->message eq 'Missing URL in request' );			# 134
 
 @b = move_url(' ', 'file:/tmp/ ');
-ok( !$b[0] );								# 90
-ok(  $@ eq 'Missing GET URL');						# 91
+ok( !$b[0] );								# 135
+ok(  $@ eq 'Missing GET URL');						# 136
 
 @b = move_url('/etc/passwd', ' ');
-ok( !$b[0] );								# 92
-ok(  $@ eq 'Missing PUT URL' );						# 93
+ok( !$b[0] );								# 137
+ok(  $@ eq 'Missing PUT URL' );						# 138
 
 @b = put_urls('test', ' ');
-ok( !$b[0]->is_success );						# 94
-ok(  $b[0]->message eq 'Missing URL in request' );			# 95
+ok( !$b[0]->is_success );						# 139
+ok(  $b[0]->message eq 'Missing URL in request' );			# 140
 
 # Test copy_urls.
 @b = copy_urls(['', $from_urls[0]], [@to_urls, '', 'file:/no/such/path/ZZZ/']);
-ok( @b );								# 96
-ok( !$b[0]->is_success );						# 97
-ok(  $b[0]->message eq 'Missing URL in request' );			# 98
-ok(  $b[1]->is_success );						# 99
-ok(  $b[1]->{put_requests}[0]->is_success );				# 100
-ok(  $b[1]->{put_requests}[1]->is_success );				# 101
-ok(  $b[1]->{put_requests}[2]->is_success );				# 102
-ok(  $b[1]->{put_requests}[3]->is_success );				# 103
-ok(  $b[1]->{put_requests}[4]->is_success );				# 104
-ok( !$b[1]->{put_requests}[5]->is_success );				# 105
-ok(  $b[1]->{put_requests}[5]->message eq 'Missing URL in request' );	# 106
-ok( !$b[1]->{put_requests}[6]->is_success );				# 107
-ok(  $b[1]->{put_requests}[6]->message eq 'No such file or directory' ); # 108
+ok( @b );								# 141
+ok(  $b[0] );								# 142
+ok(  $b[1] );								# 143
+ok( !$b[0]->is_success );						# 144
+ok(  $b[0]->message eq 'Missing URL in request' );			# 145
+ok(  $b[1]->is_success );						# 146
+ok(  $b[1]->{put_requests}[0]->is_success );				# 147
+ok(  $b[1]->{put_requests}[1]->is_success );				# 148
+ok(  $b[1]->{put_requests}[2]->is_success );				# 149
+ok(  $b[1]->{put_requests}[3]->is_success );				# 150
+ok(  $b[1]->{put_requests}[4]->is_success );				# 151
+ok( !$b[1]->{put_requests}[5]->is_success );				# 152
+ok(  $b[1]->{put_requests}[5]->message eq 'Missing URL in request' );	# 153
+ok( !$b[1]->{put_requests}[6]->is_success );				# 154
+ok(  $b[1]->{put_requests}[6]->message eq 'No such file or directory' ); # 155
 
 # Try to read all of the files we put and compare with what we've read.
 @b = get_urls(@to_urls);
-ok(  @b == @from_files );						# 109
-ok(  $b[0]->is_success and $b[0]->content eq $a[0]->content );		# 110
-ok(  $b[1]->is_success and $b[1]->content eq $a[0]->content );		# 111
-ok(  $b[2]->is_success and $b[2]->content eq $a[0]->content );		# 112
-ok(  $b[3]->is_success and $b[3]->content eq $a[0]->content );		# 113
-ok(  $b[4]->is_success and $b[4]->content eq $a[0]->content );		# 114
+ok( @b == @from_files );						# 156
+ok( $b[0] );								# 157
+ok( $b[1] );								# 158
+ok( $b[2] );								# 159
+ok( $b[3] );								# 160
+ok( $b[4] );								# 161
+ok( $b[0]->is_success and $b[0]->content eq $a[0]->content );		# 162
+ok( $b[1]->is_success and $b[1]->content eq $a[0]->content );		# 163
+ok( $b[2]->is_success and $b[2]->content eq $a[0]->content );		# 164
+ok( $b[3]->is_success and $b[3]->content eq $a[0]->content );		# 165
+ok( $b[4]->is_success and $b[4]->content eq $a[0]->content );		# 166
 
 # Check the directory listing code.
-ok( !list_url );							# 115
-ok( !list_url('http://www.perl.com/') );				# 116
-ok( $@ eq 'Unsupported scheme http in URL http://www.perl.com/' );	# 117
+ok( !list_url );							# 167
+ok( !list_url('http://www.perl.com/') );				# 168
+ok( $@ eq 'Unsupported scheme http in URL http://www.perl.com/' );	# 169
 @b = list_url("file://localhost/$cwd");
-ok( @b == 12 );								# 118
-ok( !list_url('file://localhost/this/path/should/not/exist') );		# 119
+ok( @b == 12 );								# 170
+ok( !list_url('file://localhost/this/path/should/not/exist') );		# 171
 # This case insensitive match is done to match on both Unix and Windows.
  #          File or directory `/this/path/should/not/exist' does not exist
-ok( $@ =~ m:File or directory `.this.path.should.not.exist' does not exist:i ); # 120
-ok( !list_url($from_urls[0]) );						# 121
-ok( $@ =~ m:t.file1' is not a directory:i );				# 122
-ok( !list_url('ftp://ftp.gps.caltech.edu/ZZZZ') );			# 123
-ok( $@ = "Cannot chdir to `ZZZ'" );					# 124
+ok( $@ =~ m:File or directory `.this.path.should.not.exist' does not exist:i ); # 172
+ok( !list_url($from_urls[0]) );						# 173
+ok( $@ =~ m:t.file1' is not a directory:i );				# 174
+ok( !list_url('ftp://ftp.gps.caltech.edu/ZZZZ') );			# 175
+ok( $@ = "Cannot chdir to `ZZZ'" );					# 176
 @b = list_url("ftp://ftp.gps.caltech.edu/");
-ok( @b == 8 );								# 125
+ok( @b == 8 );								# 177
 
 # Clean up the output files.
-ok( unlink(map { $_->local_path } @to_urls) == @from_files );		# 126
+ok( unlink(map { $_->file } @to_urls) == @from_files );			# 178
 @b = list_url("file://localhost/$cwd");
-ok( @b == 7 );								# 127
+ok( @b == 7 );								# 179

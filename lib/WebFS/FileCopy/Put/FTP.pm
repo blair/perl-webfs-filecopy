@@ -9,7 +9,7 @@ use Net::FTP;
 
 use vars qw($VERSION @ISA);
 
-$VERSION = do {my @r=(q$Revision: 0.03 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = do {my @r=(q$Revision: 1.00 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
 @ISA     = qw(Exporter);
 
 sub new {
@@ -20,7 +20,7 @@ sub new {
 
   # Get and fix path.
   my $url = $req->url;
-  my @path = $url->path_components;
+  my @path = $url->path_segments;
   # There will always be an empty first component.
   shift(@path);
   # Remove the empty trailing components.

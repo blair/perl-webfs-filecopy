@@ -25,10 +25,10 @@ sub check_version
 }
 
 # Check for needed modules.
-check_version('MD5' => '1.7') or
+check_version('Digest::MD5' => '2.06') or
   warn   "\n"
-       . "*** For WebFS::FileCopy you require version 1.7, or later, of\n"
-       . "    MD5 from CPAN/authors/id/NWINT/MD5-x.x.tar.gz\n\n";
+       . "*** For WebFS::FileCopy you require version 2.06, or later, of\n"
+       . "    MD5 from CPAN/authors/id/GAAS/Digest-MD5-x.x.tar.gz\n\n";
 
 check_version('Data::Dumper' => '2.081') or
   warn   "\n"
@@ -55,10 +55,15 @@ check_version('LWP' => '5.34') or
        . "*** For WebFS::FileCopy you require version 5.34, or later, of\n"
        . "    LWP from CPAN/authors/id/GAAS/libwww-perl-x.x.tar.gz.\n\n";
 
-check_version('LWP::Version' => '0.23') or
+check_version('LWP::Version' => '0.24') or
   warn   "\n"
-       . "*** For WebFS::FileCopy you require version 0.23, or later, of\n"
+       . "*** For WebFS::FileCopy you require version 0.24, or later, of\n"
        . "    LWP::Version from CPAN/authors/id/GAAS/LWPng-alpha-x.x.tar.gz.\n\n";
+
+check_version('URI' => '1.02') or
+  warn   "\n"
+       . "*** For WebFS::FileCopy you require version 1.02, or later, of\n"
+       . "    LWP::Version from CPAN/authors/id/GAAS/URI-x.x.tar.gz.\n\n";
 
 WriteMakefile(
   'NAME'	 => 'WebFS::FileCopy',

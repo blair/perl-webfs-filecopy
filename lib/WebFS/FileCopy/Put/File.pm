@@ -8,7 +8,7 @@ use Carp qw(cluck);
 
 use vars qw($VERSION @ISA);
 
-$VERSION = do {my @r=(q$Revision: 0.03 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = do {my @r=(q$Revision: 1.00 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
 @ISA     = qw(Exporter);
 
 sub new {
@@ -32,7 +32,7 @@ sub new {
 
   # Open the file.
   local *FH;
-  open(FH, '>' . $url->local_path) or do {
+  open(FH, '>' . $url->file) or do {
     $@ = $req->give_response(401, "$!");
     return;
   };

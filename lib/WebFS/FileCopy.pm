@@ -6,10 +6,13 @@ use strict;
 use Exporter;
 use Carp qw(croak cluck);
 use Cwd;
+use URI 1.02;
+use URI::file;
 use LWP::Version 0.23;
 use LWP::UA;
 use LWP::MainLoop qw(mainloop);
 use LWP::Conn::HTTP;
+use LWP::Conn::FTP;
 use LWP::Request;
 use HTTP::Request::Common qw(GET PUT);
 use Net::FTP;
@@ -17,7 +20,7 @@ use WebFS::FileCopy::Put;
 
 use vars qw($VERSION @ISA @EXPORT $ua);
 
-$VERSION = do {my @r=(q$Revision: 0.03 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = do {my @r=(q$Revision: 1.00 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
 @ISA     = qw(Exporter);
 @EXPORT  = qw(&copy_url &copy_urls &delete_urls &get_urls &list_url
 	      &move_url &put_urls);
@@ -156,27 +159,29 @@ sub _init_ua {
   $ua->env_proxy;
 }
 
-# Take either an URI::URL or a string URL and make it into an absolute
-# URI::URL.  Do not touch the given URL.  If the URL is missing a scheme,
-# then assume it to be file and if the file path is not an absolute one,
+# Take either an URI or a string URL and make it into an absolute URI.
+# Do not touch the given URL.  If the URL is missing a scheme, then
+# assume it to be file and if the file path is not an absolute one,
 # then assume that the current directory contains the file.
 sub _fix_url {
-  my $url  = shift;
-  my $base = shift;
+  my ($url, $base) = @_;
 
-  # Fix the URL.
+  # Fix the URL.  If the URI is not canonicalized, then with a URL like
+  # http://www.a1.com the path will be undefined.
   if (ref($url)) {
-    $url = $url->clone->abs($base);
+    $url = $url->clone;
+    $url = $url->abs($base) if defined($base) && $base;
+    $url = $url->canonical;
   }
   else {
     my $temp = $url;
-    $url = eval { URI::URL->new($url, $base); };
-    cluck "WebFS::FileCopy::_fix_url failed on $temp" if $@;
-#    if (!$url->scheme and $url->path) {
-#      $url->scheme('file');
-#      my $path = $url->epath;
-#      $url->epath(cwd . "/$path") unless $path =~ m:^/:;
-#    }
+    if (defined($base) and $base) {
+      $url = eval { URI->new_abs($url, $base)->canonical; };
+    }
+    else {
+      $url = eval { URI->new($url)->canonical; };
+    }
+    cluck "WebFS::FileCopy::_fix_url failed on $temp: $@" if $@;
   }
   $url;
 }
@@ -184,10 +189,10 @@ sub _fix_url {
 # Take a URL and return if the URL is a directory or a file.  A directory
 # always ends in /.
 sub _is_directory {
-  my $url = shift;
-  my $base = shift;
+  my ($url, $base) = @_;
 
   $url = _fix_url($url, $base);
+
   return $url ? ($url->path =~ m:/$:) : undef;
 }
 
@@ -250,7 +255,7 @@ sub put_urls {
 
   my $string_or_code = shift;
 
-  # Convert string URLs to URI::URLs.
+  # Convert string URLs to URIs.
   my @urls = map { _fix_url($_) } @_;
 
   # This holds the responses for each PUT request.
@@ -360,7 +365,7 @@ sub copy_urls {
   my @from = ref($from_input) eq 'ARRAY' ? @$from_input : ($from_input);
   my @to   = ref($to_input)   eq 'ARRAY' ? @$to_input   : ($to_input);
 
-  # Convert string URLs to URI::URLs.
+  # Convert string URLs to URIs.
   @from = map { _fix_url($_, $base) } @from;
   @to   = map { _fix_url($_, $base) } @to;
 
@@ -430,8 +435,8 @@ sub copy_urls {
       # If the to URL is a directory, then copy the filename from the
       # from URL to the to URL.
       if (_is_directory($to)) {
-        my @from_path = split(/\//, $from->epath);
-        $to->epath($to->epath . $from_path[$#from_path]);
+        my @from_path = split(/\//, $from->path);
+        $to->path($to->path . $from_path[$#from_path]);
       }
 
       # Put together a put request using the output from a get request.
@@ -486,12 +491,10 @@ sub copy_url {
     return;
   }
 
-  # Convert string URLs to URI::URLs.
+  # Convert string URLs to URIs.
   my @urls = map { _fix_url($_) } @_;
 
-  my $from = shift(@urls);
-  my $to   = shift(@urls);
-  my $base = shift(@urls);
+  my ($from, $to, $base) = splice(@urls, 0, 3);
 
   # Check for valid URLs.
   unless ($from) {
@@ -582,11 +585,9 @@ sub move_url {
     return;
   }
 
-  my $from = shift;
-  my $to   = shift;
-  my $base = shift;
+  my ($from, $to, $base) = @_;
 
-  # Convert string URLs to URI::URLs.
+  # Convert string URLs to URIs.
   $from = _fix_url($from, $base);
   $to   = _fix_url($to,   $base);
 
@@ -618,7 +619,7 @@ sub _list_file_url {
   }
 
   # Get file path.
-  my $path = $url->local_path;
+  my $path = $url->file;
 
   # Check that the directory exists and is readable.
   unless (-e $path) {
@@ -659,7 +660,7 @@ sub _list_ftp_url {
   }
 
   # Get and fix path.
-  my @path = $url->path_components;
+  my @path = $url->path_segments;
   # There will always be an empty first component.
   shift(@path);
   # Remove the empty trailing components.
@@ -753,8 +754,7 @@ sub _open_ftp_connection {
   }
 
   # Switch to ASCII or binary mode.
-  my $params = $url->params;
-  if (defined($params) && $params eq 'type=a') {
+  if ($url =~ /type=a/i) {
     $ftp->ascii;
   } else {
     $ftp->binary;
