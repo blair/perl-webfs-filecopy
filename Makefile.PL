@@ -1,0 +1,70 @@
+# This -*- perl -*- script writes the Makefile for this package.
+
+use strict;
+use ExtUtils::MakeMaker;
+
+# Subroutine to check for installed modules.
+sub check_version
+{
+  my ($pkg, $wanted, $msg) = @_;
+
+  local($|) = 1;
+  print "Checking for $pkg...";
+
+  eval { my $p; ($p = $pkg . ".pm") =~ s#::#/#g; require $p; };
+
+  no strict 'refs';
+
+  my $vstr = ${"${pkg}::VERSION"} ? "found v" . ${"${pkg}::VERSION"}
+                                 : "not found";
+  my $vnum = ${"${pkg}::VERSION"} || 0;
+
+  print $vnum >= $wanted ? "ok\n" : " " . $vstr . "\n";
+
+  $vnum >= $wanted;
+}
+
+# Check for needed modules.
+check_version('MD5' => '1.7') or
+  warn   "\n"
+       . "*** For EGADS you require version 1.7, or later, of\n"
+       . "    MD5 from CPAN/authors/id/NWINT/MD5-x.x.tar.gz\n\n";
+
+check_version('Data::Dumper' => '2.081') or
+  warn   "\n"
+       . "*** For EGADS you require version 2.081, or later, of\n"
+       . "    Data::Dumper from CPAN/authors/id/GSAR/Data-Dumper-x.x.tar.gz\n\n";
+
+check_version('Net::FTP' => '2.33') or
+  warn   "\n"
+       . "*** For EGADS you require version 2.33, or later, of\n"
+       . "    Net::FTP from CPAN/authors/id/GBARR/libnet-x.x.tar.gz\n\n";
+
+check_version('MIME::Base64' => '2.05') or
+  warn   "\n"
+       . "*** For EGADS you require version 2.05, or later, of\n"
+       . "    MIME::Base64 from CPAN/authors/id/GAAS/MIME-Base64-x.x.tar.gz.\n\n";
+
+check_version('HTML::Parser' => '2.18') or
+  warn   "\n"
+       . "*** For EGADS you require version 2.18, or later, of\n"
+       . "    HTML::Parser from CPAN/authors/id/GAAS/HTML-Parser-x.x.tar.gz.\n\n";
+
+check_version('LWP' => '5.33') or
+  warn   "\n"
+       . "*** For EGADS you require version 5.33, or later, of\n"
+       . "    LWP from CPAN/authors/id/GAAS/libwww-perl-5.33.tar.gz.\n\n";
+
+check_version('LWP::Version' => '0.21') or
+  warn   "\n"
+       . "*** For EGADS you require version 0.21, or later, of\n"
+       . "    LWP::Version from CPAN/authors/id/GAAS/LWPng-alpha-x.x.tar.gz.\n\n";
+
+WriteMakefile(
+  'NAME'	 => 'WebFS::FileCopy',
+  'VERSION_FROM' => 'lib/WebFS/FileCopy.pm', # finds $VERSION
+  'dist'         => {
+    'COMPRESS'   => 'gzip',
+    'SUFFIX'     => 'gz'
+  },
+);	

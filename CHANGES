@@ -1,0 +1,35 @@
+Sun Jun 28 11:22:57 PDT 1998 <blair@gps.caltech.edu> (Blair Zajac)
+
+	Have WebFS::FileCopy use version 0.21 of LWPng or greater.
+
+	Add warning note in README regarding the alpha LWPng code.
+
+	Release version 0.02.
+
+Fri Jun 26 13:47:48 PDT 1998 <blair@gps.caltech.edu> (Blair Zajac)
+
+	Rename URI::Copy to WebFS::FileCopy.
+
+Sun Jun 21 11:14:07 PDT 1998 <blair@gps.caltech.edu> (Blair Zajac)
+
+	Rename URI::File::Copy to URI::Copy.
+
+Thu Jun 18 12:16:25 PDT 1998 <blair@gps.caltech.edu> (Blair Zajac)
+
+	Remove use Data::Dumper from URI::File::Copy.
+
+	Add README documentation.
+
+Thu May 21 17:33:55 PDT 1998 <blair@gps.caltech.edu> (Blair Zajac)
+
+	Fix a mistake in the example code for get_urls.
+
+Fri May 15 15:18:22 PDT 1998 <blair@gps.caltech.edu> (Blair Zajac)
+
+	Added list_url, which returns a list of files in a directory
+	pointed to by a URL.
+
+Wed May 13 18:19:38 PDT 1998 <blair@gps.caltech.edu> (Blair Zajac)
+
+	Version 0.01
+	First version.
