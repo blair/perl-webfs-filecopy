@@ -1,6 +1,6 @@
 package WebFS::FileCopy::Put::File;
 
-# Copyright (C) 1998-2001 by Blair Zajac.  All rights reserved.  This
+# Copyright (C) 1998-2005 by Blair Zajac.  All rights reserved.  This
 # package is free software; you can redistribute it and/or modify it
 # under the same terms as Perl itself.
 
