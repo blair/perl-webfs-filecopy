@@ -1,5 +1,9 @@
 package WebFS::FileCopy::Put::FTP;
 
+# Copyright (C) 1998-2001 by Blair Zajac.  All rights reserved.  This
+# package is free software; you can redistribute it and/or modify it
+# under the same terms as Perl itself.
+
 require 5.004_04;
 
 use strict;
@@ -10,7 +14,7 @@ use Net::FTP;
 use vars qw(@ISA $VERSION);
 
 @ISA     = qw(Exporter);
-$VERSION = substr q$Revision: 1.02 $, 10;
+$VERSION = substr q$Revision: 1.03 $, 10;
 
 sub new {
   my ($class, $req) = @_;

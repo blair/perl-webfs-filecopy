@@ -1,3 +1,17 @@
+Fri Feb  2 16:28:18 PST 2001
+
+        Release version 1.03.
+
+Fri Feb  2 16:17:40 PST 2001
+
+	Include two patches to apply to LWPng-alpha-0.24 to improve
+	portibility to newer versions of Perl and Win32 platforms.
+
+	The test script was failing in one test since the FTP site
+	being used for testing was slightly modified.  Change the
+	script to hopefully do the same test in a location that will
+	not change.
+
 Thu Nov  2 11:00:13 PST 2000
 
 	Release version 1.02.

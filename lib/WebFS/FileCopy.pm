@@ -1,5 +1,9 @@
 package WebFS::FileCopy;
 
+# Copyright (C) 1998-2001 by Blair Zajac.  All rights reserved.  This
+# package is free software; you can redistribute it and/or modify it
+# under the same terms as Perl itself.
+
 require 5.004_04;
 
 use strict;
@@ -23,7 +27,7 @@ use vars qw(@EXPORT @ISA $VERSION $ua $WARN_DESTROY);
 @EXPORT  = qw(&copy_url &copy_urls &delete_urls &get_urls &list_url
 	      &move_url &put_urls);
 @ISA     = qw(Exporter);
-$VERSION = substr q$Revision: 1.02 $, 10;
+$VERSION = substr q$Revision: 1.03 $, 10;
 
 # To allow debugging of object destruction, setting WARN_DESTORY to 1
 # till have DESTROY methods print a message when a object is destroyed.
@@ -1059,8 +1063,8 @@ Blair Zajac <blair@akamai.com>
 
 =head1 COPYRIGHT
 
-Copyright (c) 1998 by Blair Zajac.  All rights reserved.  This package
-is free software; you can redistribute it and/or modify it under the
-same terms as Perl itself.
+Copyright (C) 1998-2001 by Blair Zajac.  All rights reserved.  This
+package is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
 
 =cut

@@ -1,4 +1,4 @@
-Package WebFS::FileCopy version 1.02
+Package WebFS::FileCopy version 1.03
 
 This is the WebFS::FileCopy package.  This module provides subroutines
 for the getting, putting, copying, moving and deleting of files
@@ -24,12 +24,28 @@ Notable features:
 
    * List the contents of a URI directory.
 
-WARNING
+WARNINGS AND LWPng PATCHES
 
 This package is based on Gisle Aas's LWPng-alpha module, which is
 still alpha code.  Because the LWPng interface may change in the
 future, this module may break if LWPng is updated in the future
 without updating WebFS::FileCopy.
+
+There are two available patches to LWPng in the patches subdirectory:
+
+  1) patches/LWPng-0.24-patch-1
+
+     The first guesses the content type and try to determine if a file
+     to be read from disk should be read in binary or text mode.  Go
+     into binary mode unless the content type is some form of text.
+     This is really only useful in Win32 platforms.
+
+  2) patches/LWPng-0.24-patch-2
+
+     With at least Perl version 5.6.0, you will need to apply the
+     following patch to LWPng to prevent a 'Prototype mismatch: sub
+     IO::Handle::blocking ($;$) vs none at ../lib/LWP/Conn/_Connect.pm
+     line 43' warning.
 
 REQUIREMENTS
 
@@ -89,6 +105,6 @@ Zajac <blair@akamai.com>.
 
 COPYRIGHT
 
-Copyright (c) 1998, 1999, 2000 Blair Zajac.  All rights reserved.
-This package is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
+Copyright (C) 1998-2001 Blair Zajac.  All rights reserved.  This
+package is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.

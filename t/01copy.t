@@ -306,8 +306,8 @@ ok( !list_url($from_uris[0]) );						# 173
 ok( $@ =~ m:t.file1' is not a directory:i );				# 174
 ok( !list_url('ftp://ftp.gps.caltech.edu/ZZZZ') );			# 175
 ok( $@ = "Cannot chdir to `ZZZ'" );					# 176
-@b = list_url("ftp://ftp.gps.caltech.edu/");
-ok( @b == 8 );								# 177
+@b = list_url("ftp://ftp.gps.caltech.edu/etc");
+ok( @b == 5 );								# 177
 
 # Try one function with a HTTP::Request object.  Because we are doing
 # a GET on a object but passing in a request with a DELETE method,
