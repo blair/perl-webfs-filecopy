@@ -1,27 +1,27 @@
-Package WebFS::FileCopy version 1.00
+Package WebFS::FileCopy version 1.01
 
 This is the WebFS::FileCopy package.  This module provides subroutines
 for the getting, putting, copying, moving and deleting of files located by
-URLs.  It also supports listing directories identified by URL.  Currently,
-files for getting can use any URL protocol, such as file, FTP, HTTP, etc.
+URIs.  It also supports listing directories identified by URI.  Currently,
+files for getting can use any URI protocol, such as file, FTP, HTTP, etc.
 For putting, only the file and FTP protocols are currently supported.
 
 Notable features:
 
    * Uses LWPng for simultaneous file transfers.
 
-   * Get the contents of multiple URLs simultaneously.
+   * Get the contents of multiple URIs simultaneously.
 
-   * Put content into multiple URLs simultaneously.
+   * Put content into multiple URIs simultaneously.
 
-   * Copy multiple files located by URLs to multiple locations
+   * Copy multiple files located by URIs to multiple locations
      simultaneously.
 
-   * Delete a file located by a URL.
+   * Delete a file located by a URI.
 
-   * Move a file located from located at one URL to another location.
+   * Move a file located from located at one URI to another location.
 
-   * List the contents of a URL directory.
+   * List the contents of a URI directory.
 
 WARNING
 
@@ -84,10 +84,10 @@ documentation from the module files directly.
 AUTHOR, COMMENTS AND BUGS
 
 I welcome all comments and bug reports.  Please email them to Blair
-Zajac <blair@gps.caltech.edu>.
+Zajac <blair@geostaff.com>.
 
 COPYRIGHT
 
-Copyright (c) 1998, 1999 Blair Zajac. All rights reserved.  This package
-is free software; you can redistribute it and/or modify it under the
-same terms as Perl itself.
+Copyright (c) 1998, 1999 Blair Zajac.  All rights reserved.  This
+package is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.

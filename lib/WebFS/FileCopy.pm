@@ -18,12 +18,28 @@ use HTTP::Request::Common qw(GET PUT);
 use Net::FTP;
 use WebFS::FileCopy::Put;
 
-use vars qw($VERSION @ISA @EXPORT $ua);
+use vars qw(@EXPORT @ISA $VERSION $ua $WARN_DESTROY);
 
-$VERSION = do {my @r=(q$Revision: 1.00 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
-@ISA     = qw(Exporter);
 @EXPORT  = qw(&copy_url &copy_urls &delete_urls &get_urls &list_url
 	      &move_url &put_urls);
+@ISA     = qw(Exporter);
+$VERSION = do {my @r=(q$Revision: 1.01 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
+
+# To allow debugging of object destruction, setting WARN_DESTORY to 1
+# till have DESTROY methods print a message when a object is destroyed.
+$WARN_DESTROY = 0;
+
+# Unless the data_cb and done_cb elements of a LWP::Request object are
+# deleted after use, the all objects using them will not DESTROY till the
+# end of execution of the program.  Use this subroutine to remove these
+# elements.
+sub _cleanup_requests {
+  foreach my $get_req (@_) {
+    next unless $get_req;
+    delete $get_req->{data_cb};
+    delete $get_req->{done_cb};
+  }
+}
 
 package WebFS::FileCopy::UA;
 use base 'LWP::UA';
@@ -69,12 +85,12 @@ sub _start_transfer_request {
   return $get_res unless $get_res->is_success;
 
   # This array holds the file: or ftp: objects that support print and
-  # close methods on the outgoing data.  Is the put fails, then hold the
+  # close methods on the outgoing data.  If the put fails, then hold the
   # response placed into $@.  Keep track that the responses for each PUT
   # are in the same order as the requests.
   my @put_connections = ();
-  my @put_res = ();
-  my $i = 0;
+  my @put_res         = ();
+  my $i               = 0;
   foreach my $put_req (@put_req) {
     my $conn = WebFS::FileCopy::Put->new($put_req);
     if ($conn) {
@@ -91,7 +107,7 @@ sub _start_transfer_request {
   # This subroutine writes the current get contents to the output handles.
   my $print_sub = sub {
     my $get_res = shift;
-    my $buffer = $get_res->content('');
+    my $buffer  = $get_res->content('');
     return unless length($buffer);
     foreach my $put_conn (@put_connections) {
       next unless $put_conn;
@@ -124,10 +140,17 @@ sub _start_transfer_request {
   $get_req->{done_cb} = $done_cb_sub;
 
   # The gets may already be completed at this point.  If this is so, then
-  # send the data to the outgoing URLs and close up.
+  # send the data to the outgoing URIs and close up.
   &$done_cb_sub($get_res) if exists($get_res->{done});
 
   $get_res;
+}
+
+sub DESTROY {
+  if ($WebFS::FileCopy::WARN_DESTROY) {
+    my $self = shift;
+    print STDERR "DESTROYing $self\n";
+  }
 }
 
 package WebFS::FileCopy::Response;
@@ -151,6 +174,13 @@ sub _read_content {
   $data;
 }
 
+sub DESTROY {
+  if ($WebFS::FileCopy::WARN_DESTROY) {
+    my $self = shift;
+    print STDERR "DESTROYing $self\n";
+  }
+}
+
 package WebFS::FileCopy;
 
 sub _init_ua {
@@ -159,47 +189,71 @@ sub _init_ua {
   $ua->env_proxy;
 }
 
-# Take either an URI or a string URL and make it into an absolute URI.
-# Do not touch the given URL.  If the URL is missing a scheme, then
-# assume it to be file and if the file path is not an absolute one,
-# then assume that the current directory contains the file.
-sub _fix_url {
-  my ($url, $base) = @_;
+# Take either a string, a URI, a HTTP::Request, a LWP::Request and make
+# it into an absolute URI.  Do not touch the given URI.  If the URI is
+# missing a scheme, then assume it to be file and if the file path is
+# not an absolute one, then assume that the current directory contains
+# the file.
+sub _create_uri {
+  my ($uri, $base) = @_;
 
-  # Fix the URL.  If the URI is not canonicalized, then with a URL like
-  # http://www.a1.com the path will be undefined.
-  if (ref($url)) {
-    $url = $url->clone;
-    $url = $url->abs($base) if defined($base) && $base;
-    $url = $url->canonical;
+  # Handle the URI differently if it is a string or an object.  If the uri
+  # is an object, then check if it is a HTTP::Request or a child of that
+  # class and take the URI from that object.  Now we have a URI object and
+  # make sure it is canonicalized, since with a URI like http://www.a1.com
+  # the path will be undefined.
+  if (ref($uri)) {
+    $uri = $uri->uri if $uri->isa('HTTP::Request');
+    $uri = $uri->clone;
+    $uri = $uri->abs($base) if defined($base) && $base;
+    $uri = $uri->canonical;
   }
   else {
-    my $temp = $url;
+    my $temp = $uri;
     if (defined($base) and $base) {
-      $url = eval { URI->new_abs($url, $base)->canonical; };
+      $uri = eval { URI->new_abs($uri, $base)->canonical; };
     }
     else {
-      $url = eval { URI->new($url)->canonical; };
+      $uri = eval { URI->new($uri)->canonical; };
     }
-    cluck "WebFS::FileCopy::_fix_url failed on $temp: $@" if $@;
+    cluck "WebFS::FileCopy::_create_uri failed on $temp: $@" if $@;
   }
-  $url;
+  $uri;
 }
 
-# Take a URL and return if the URL is a directory or a file.  A directory
+# Take a request method (POST, GET, etc) and either a string URI, a URI
+# object, a HTTP::Request or subclass of HTTP::Request object such as
+# LWP::Request.  Make use of _create_uri if the URI is not a HTTP::Request
+# type.  If it is a HTTP::Request make a clone and work with that.
+sub _create_request {
+  my ($method, $uri, $base) = @_;
+
+  if (ref($uri) and $uri->isa('HTTP::Request')) {
+    # Recase the object into a LWP::Request and make sure the method
+    # is the request type.
+    $uri = bless $uri->clone, 'LWP::Request';
+    $uri->method($method);
+    return $uri;
+  }
+  else {
+    return LWP::Request->new($method, _create_uri($uri, $base));
+  }
+}
+
+# Take a URI and return if the URI is a directory or a file.  A directory
 # always ends in /.
 sub _is_directory {
-  my ($url, $base) = @_;
+  my ($uri, $base) = @_;
 
-  $url = _fix_url($url, $base);
+  $uri = _create_uri($uri, $base);
 
-  return $url ? ($url->path =~ m:/$:) : undef;
+  return $uri ? ($uri->path =~ m:/$:) : undef;
 }
 
 sub get_urls {
   return () unless @_;
 
-  my @urls = @_;
+  my @uris = @_;
 
   _init_ua unless $ua;
 
@@ -207,9 +261,8 @@ sub get_urls {
   my @get_req = ();
   my @get_res = ();
   my $i = 0;
-  foreach my $url (@urls) {
-    $url = _fix_url($url);
-    my $get_req = LWP::Request->new('GET' => $url);
+  foreach my $uri (@uris) {
+    my $get_req = _create_request('GET', $uri);
 
     # $j is created here to be local to this loop and recorded in each
     # anonymous subroutine created below.
@@ -242,6 +295,9 @@ sub get_urls {
     mainloop->one_event;
   }
 
+  # Allow garbage collection to happen.
+  _cleanup_requests(@get_req);
+
   # Return the responses.
   @get_res;
 }
@@ -255,39 +311,39 @@ sub put_urls {
 
   my $string_or_code = shift;
 
-  # Convert string URLs to URIs.
-  my @urls = map { _fix_url($_) } @_;
+  # Convert string URIs to LWP::Requests.
+  my @put_reqs = map { _create_request('PUT', $_) } @_;
 
   # This holds the responses for each PUT request.
   my @put_res = ();
 
-  # Go through each URL and create a request for it if the URL is ok.
+  # Go through each URI and create a request for it if the URI is ok.
   my @put_req = ();
   my $leave_now = 1;
-  foreach my $url (@urls) {
-    my $put_req = LWP::Request->new('PUT' => $url);
+  foreach my $put_req (@put_reqs) {
+    my $uri = $put_req->uri;
 
     # We put this in so that give_response can be used.
     $put_req->{done_cb} = sub { $_[0]; };
 
-    # Need a valid URL.
-    unless ($url) {
+    # Need a valid URI.
+    unless ($uri) {
       push(@put_req, 0);
       push(@put_res,
         $put_req->give_response(400, 'Missing URL in request'));
       next;
     }
 
-    # URL cannot be a directory.
-    if (_is_directory($url)) {
+    # URI cannot be a directory.
+    if (_is_directory($uri)) {
       push(@put_req, 0);
       push(@put_res,
         $put_req->give_response(403, 'URL cannot be a directory'));
       next;
     }
 
-    # URL scheme needs to be either ftp or file.
-    my $scheme = $url->scheme;
+    # URI scheme needs to be either ftp or file.
+    my $scheme = $uri->scheme;
     unless ($scheme && ($scheme eq 'ftp' or $scheme eq 'file')) {
       push(@put_req, 0);
       push(@put_res,
@@ -302,8 +358,12 @@ sub put_urls {
   }
 
   # Leave now if there are no valid requests.  @put_req contains 0's for
-  # each invalid URL.
-  return @put_res if $leave_now;
+  # each invalid URI.
+  if ($leave_now) {
+    # Allow garbage collection to happen.
+    _cleanup_requests(@put_req);
+    return @put_res;
+  }
 
   _init_ua unless $ua;
 
@@ -348,6 +408,9 @@ sub put_urls {
     ++$i;
   }
 
+  # Allow garbage collection to happen.
+  _cleanup_requests(@put_req);
+
   @put_res;
 }
 
@@ -361,86 +424,92 @@ sub copy_urls {
   my ($from_input, $to_input, $base) = @_;
 
   # Create the arrays holding the to and from locations using either the
-  # array references or the single URLs.
+  # array references or the single URIs.
   my @from = ref($from_input) eq 'ARRAY' ? @$from_input : ($from_input);
   my @to   = ref($to_input)   eq 'ARRAY' ? @$to_input   : ($to_input);
 
-  # Convert string URLs to URIs.
-  @from = map { _fix_url($_, $base) } @from;
-  @to   = map { _fix_url($_, $base) } @to;
+  # Convert string URIs to LWP::Requests.
+  @from = map { _create_request('GET', $_, $base) } @from;
+  @to   = map { _create_request('PUT', $_, $base) } @to;
 
-  # Check the arguments.
+  my $number_valid_froms = grep($_->uri, @from);
+  my $number_valid_tos   = grep($_->uri, @to);
 
-  # We ignore empty URLs, but make sure there are some URLs.
-  unless (grep($_, @from)) {
+  # We ignore empty URIs, but make sure there are some URIs.
+  unless ($number_valid_froms) {
     $@ = 'No non-empty GET URLs';
     return;
   }
 
-  unless (grep($_, @to)) {
+  unless ($number_valid_tos) {
     $@ = 'No non-empty PUT URLs';
     return;
   }
 
-  # Check that the to destination URLs are either file: or ftp:.
-  foreach my $to (@to) {
+  # Check that the to destination URIs are either file: or ftp:.
+  foreach my $put_req (@to) {
     # Skip empty requests.
-    next unless $to;
-    my $scheme = $to->scheme;
+    my $uri = $put_req->uri;
+    next unless $uri;
+    my $scheme = $uri->scheme;
     unless ($scheme && ($scheme eq 'ftp' or $scheme eq 'file')) {
-      $@ = "Can only copy to file or FTP URLs: $to";
+      $@ = "Can only copy to file or FTP URLs: " . $uri;
       return;
     }
   }
 
-  # All of the from URLs must be files.
-  foreach my $from (@from) {
-    if ($from and _is_directory($from)) {
-      $@ = "Cannot copy directories: $from";
+  # All of the from URIs must be non-directories.
+  foreach my $get_req (@from) {
+    my $uri = $get_req->uri;
+    if ($uri and _is_directory($uri)) {
+      $@ = "Cannot copy directories: " . $uri;
       return;
     }
   }
 
-  # If any of the destination URLs is a file, then there can only be
-  # one source URL.
-  foreach my $to (@to) {
-    next unless $to;
-    if (!_is_directory($to) and grep($_, @from) > 1) {
+  # If any of the destination URIs is a file, then there can only be
+  # one source URI.
+  if ($number_valid_froms > 1) {
+    foreach my $put_req (@to) {
+      my $uri = $put_req->uri;
+      next unless $uri;
+      if (!_is_directory($uri)) {
         $@ = 'Cannot copy many files to one file';
         return;
+      }
     }
   }
 
   _init_ua unless $ua;
 
-  # Set up the transfer between the from and to URLs.
+  # Set up the transfer between the from and to URIs.
   my @get_res = ();
-  foreach my $from (@from) {
+  foreach my $get_req (@from) {
+    my $from_uri = $get_req->uri;
 
-    # Put together the initial read request.
-    my $get_req = LWP::Request->new('GET' => $from);
-
-    # If the from URL is empty, then generate a missing URL response.
-    unless ($from) {
+    # If the from URI is empty, then generate a missing URI response.
+    unless ($from_uri) {
       $get_req->{done_cb} = sub { $_[0]; };
       push(@get_res, $get_req->give_response(400, 'Missing URL in request'));
       next;
     }
 
-    # Do not generate the put requests if this is an empty from URL.
+    # Do not generate the put requests if this is an empty from URI.
     my @put_req = ();
 
     foreach (@to) {
-      my $to = $_->clone;
-      # If the to URL is a directory, then copy the filename from the
-      # from URL to the to URL.
-      if (_is_directory($to)) {
-        my @from_path = split(/\//, $from->path);
-        $to->path($to->path . $from_path[$#from_path]);
+      my $put_req = $_->clone;
+      my $to_uri  = $put_req->uri;
+      # If the to URI is a directory, then copy the filename from the
+      # from URI to the to URI.
+      if (_is_directory($to_uri)) {
+        my @from_path = split(/\//, $from_uri->path);
+        $to_uri->path($to_uri->path . $from_path[$#from_path]);
+        $put_req->uri($to_uri);
       }
 
       # Put together a put request using the output from a get request.
-      push(@put_req, LWP::Request->new('PUT' => $to));
+      push(@put_req, $put_req);
     }
     my $get_res = $ua->_start_transfer_request($get_req, @put_req);
     push(@get_res, $get_res) if $get_res;
@@ -457,28 +526,31 @@ sub copy_urls {
     mainloop->one_event;
   }
 
+  # Allow garbage collection to happen.
+  _cleanup_requests(@from, @to);
+
   @get_res;
 }
 
 # Print a status summary using the return from copy_urls.
 sub _dump {
-  my @get_res = @_;
-  foreach my $get_res (@get_res) {
-    my $url = $get_res->request->url;
-    print STDERR "GET from $url ";
+  my $fd = (ref($_[0]) || $_[0] =~ /^\*[\w:]+\w$/) ? shift : 'STDOUT';
+  foreach my $get_res (@_) {
+    my $uri = $get_res->request->uri;
+    print $fd "GET from $uri ";
     unless ($get_res->is_success) {
-      print "FAILED ", $get_res->message, "\n";
+      print $fd "FAILED ", $get_res->message, "\n";
       next;
     }
 
-    print STDERR "SUCCEEDED\n";
+    print $fd "SUCCEEDED\n";
     foreach my $c (@{$get_res->{put_requests}}) {
-      $url = $c->request->url;
+      $uri = $c->request->uri;
       if ($c->is_success) {
-        print STDERR "    to $url succeeded\n"
+        print $fd "    to $uri succeeded\n"
       }
       else {
-        print STDERR "    to $url failed: ", $c->message, "\n";
+        print $fd "    to $uri failed: ", $c->message, "\n";
       }
     }
   }
@@ -491,18 +563,19 @@ sub copy_url {
     return;
   }
 
-  # Convert string URLs to URIs.
-  my @urls = map { _fix_url($_) } @_;
+  my ($from, $to, $base) = @_;
 
-  my ($from, $to, $base) = splice(@urls, 0, 3);
+  # Convert string URIs to URIs.
+  $from = _create_request('GET', $from, $base);
+  $to   = _create_request('PUT', $to,   $base);
 
-  # Check for valid URLs.
-  unless ($from) {
+  # Check for valid URIs.
+  unless ($from->uri) {
     $@ = 'Missing GET URL';
     return;
   }
 
-  unless ($to) {
+  unless ($to->uri) {
     $@ = 'Missing PUT URL';
     return;
   }
@@ -513,7 +586,7 @@ sub copy_url {
 
   my $get_res = shift(@ret);
   unless ($get_res->is_success) {
-    $@ = 'GET ' . $get_res->request->url . ': ' . $get_res->message;
+    $@ = 'GET ' . $get_res->request->uri . ': ' . $get_res->message;
     return 0;
   }
   my @put_res = @{$get_res->{put_requests}};
@@ -528,7 +601,7 @@ sub copy_url {
   # Check each PUT request.
   foreach my $put_res (@put_res) {
     unless ($put_res->is_success) {
-      $@ = 'PUT ' . $put_res->request->url . ': ' . $put_res->message;
+      $@ = 'PUT ' . $put_res->request->uri . ': ' . $put_res->message;
       return 0;
     }
   }
@@ -536,19 +609,18 @@ sub copy_url {
 }
 
 sub delete_urls {
-  my @urls = @_;
+  my @uris = @_;
 
-  return () unless @urls;
+  return () unless @uris;
 
   _init_ua unless $ua;
 
-  # Go through each URL, create a request, and spool it.
+  # Go through each URI, create a request, and spool it.
   my @del_req = ();
   my @del_res = ();
   my $i = 0;
-  foreach my $url (@urls) {
-    $url = _fix_url($url);
-    my $del_req = LWP::Request->new('DELETE' => $url);
+  foreach my $uri (@uris) {
+    my $del_req = _create_request('DELETE', $uri);
 
     # $j is created here to be local to this loop and recorded in each
     # anonymous subroutine created below.
@@ -574,6 +646,9 @@ sub delete_urls {
     mainloop->one_event;
   }
 
+  # Allow garbage collection to happen.
+  _cleanup_requests(@del_req);
+
   # Return the status.
   @del_res;
 }
@@ -587,11 +662,11 @@ sub move_url {
 
   my ($from, $to, $base) = @_;
 
-  # Convert string URLs to URIs.
-  $from = _fix_url($from, $base);
-  $to   = _fix_url($to,   $base);
+  # Convert string URIs to URIs.
+  $from = _create_request('GET', $from, $base);
+  $to   = _create_request('PUT', $to,   $base);
 
-  # Copy the URL.  Make sure to pass down $@ failures from copy_url.
+  # Copy the URI.  Make sure to pass down $@ failures from copy_url.
   if (copy_url($from, $to)) {
     my @ret = delete_urls($from);
     my $ret = $ret[0];
@@ -608,18 +683,18 @@ sub move_url {
   }
 }
 
-sub _list_file_url {
-  my $url = shift;
+sub _list_file_uri {
+  my $uri = shift;
 
   # Check that the host is ok.
-  my $host = $url->host;
+  my $host = $uri->host;
   if ($host and $host !~ /^localhost$/i) {
     $@ = 'Only file://localhost/ allowed';
     return;
   }
 
   # Get file path.
-  my $path = $url->file;
+  my $path = $uri->file;
 
   # Check that the directory exists and is readable.
   unless (-e $path) {
@@ -643,15 +718,16 @@ sub _list_file_url {
 
   my @listing = sort readdir(D);
 
-  closedir(D) or warn "Error in closing directory `$path': $!\n";
+  closedir(D) or
+    print STDERR "$0: error in closing directory `$path': $!\n";
 
   @listing;
 }
 
-sub _list_ftp_url {
-  my $url = shift;
+sub _list_ftp_uri {
+  my $uri = shift;
 
-  my $req = LWP::Request->new('GET' => $url);
+  my $req = _create_request('GET', $uri);
   $req->{done_cb} = sub { $_[0] };
   my $ftp = _open_ftp_connection($req);
   unless ($ftp) {
@@ -660,7 +736,7 @@ sub _list_ftp_url {
   }
 
   # Get and fix path.
-  my @path = $url->path_segments;
+  my @path = $uri->path_segments;
   # There will always be an empty first component.
   shift(@path);
   # Remove the empty trailing components.
@@ -684,25 +760,25 @@ sub _list_ftp_url {
 }
 
 sub list_url {
-  my $url = shift;
+  my $uri = shift;
 
-  $url = _fix_url($url);
-  unless ($url) {
+  $uri = _create_uri($uri);
+  unless ($uri) {
     $@ = "Missing URL";
     return;
   }
 
-  my $scheme = $url->scheme;
+  my $scheme = $uri->scheme;
   unless ($scheme) {
-    $@ = "Missing scheme in URL $url";
+    $@ = "Missing scheme in URL $uri";
     return;
   }
 
   my @listing = ();
   if ($scheme eq 'file' || $scheme eq 'ftp' ) {
-    my $code = "_list_${scheme}_url";
+    my $code = "_list_${scheme}_uri";
     no strict 'refs';
-    my @listing = &$code($url);
+    my @listing = &$code($uri);
     if (@listing) {
       return @listing;
     }
@@ -711,7 +787,7 @@ sub list_url {
     }
   }
   else {
-    $@ = "Unsupported scheme $scheme in URL $url";
+    $@ = "Unsupported scheme $scheme in URL $uri";
     return;
   }
 
@@ -724,8 +800,8 @@ sub list_url {
 sub _open_ftp_connection {
   my $req = shift;
 
-  my $url = $req->url;
-  unless ($url->scheme eq 'ftp') {
+  my $uri = $req->uri;
+  unless ($uri->scheme eq 'ftp') {
     cluck "Use a FTP URL";
     $@ = $req->give_response(400, "Use a FTP URL");
     return;
@@ -733,12 +809,12 @@ sub _open_ftp_connection {
 
   # Handle user authentication.
   my ($user, $pass) = $req->authorization_basic;
-  $user  ||= $url->user || 'anonymous';
-  $pass  ||= $url->password || 'nobody@';
+  $user  ||= $uri->user || 'anonymous';
+  $pass  ||= $uri->password || 'nobody@';
   my $acct = $req->header('Account') || 'home';
 
   # Open the initial connection.
-  my $ftp = Net::FTP->new($url->host);
+  my $ftp = Net::FTP->new($uri->host);
   unless ($ftp) {
     $@ =~ s/^Net::FTP: //;
     $@ = $req->give_response(500, $@);
@@ -754,7 +830,7 @@ sub _open_ftp_connection {
   }
 
   # Switch to ASCII or binary mode.
-  if ($url =~ /type=a/i) {
+  if ($uri =~ /type=a/i) {
     $ftp->ascii;
   } else {
     $ftp->binary;
@@ -771,7 +847,7 @@ __END__
 
 =head1 NAME
 
-WebFS::FileCopy - Get, put, move, copy, and delete files located by URLs
+WebFS::FileCopy - Get, put, move, copy, and delete files located by URIs
 
 =head1 SYNOPSIS
 
@@ -779,6 +855,11 @@ WebFS::FileCopy - Get, put, move, copy, and delete files located by URLs
 
  my @res = get_urls('ftp://www.perl.com', 'http://www.netscape.com');
  print $res[0]->content if $res[0]->is_success;
+
+ # Get content from pages requiring basic authentication.
+ my $req = LWP::Request->new('GET' => 'http://www.dummy.com/');
+ $req->authorization_basic('my_username', 'my_password');
+ @res = get_urls($req);
 
  put_urls('put this text', 'ftp://ftp/incoming/new', 'file:/tmp/NEW');
  move_url('file:/tmp/NEW', 'ftp://ftp/incoming/NEW.1');
@@ -795,38 +876,42 @@ WebFS::FileCopy - Get, put, move, copy, and delete files located by URLs
 =head1 DESCRIPTION
 
 This package provides some simple routines to read, move, copy,
-and delete files as references by URLs.
+and delete files as references by string URLs, URI objects or URIs
+embedded in HTTP::Reqeust or LWP::Request objects.  All subroutines
+in this package that expect a URI will accept a string, a URI object,
+or a HTTP::Reqeust or LWP::Request with an embedded URI. If passed a
+HTTP::Request or LWP::Request, then the method of the object is ignored
+and the proper method will be used to either GET or PUT the requested UIR.
 
-The distinction between files and directories in a URL is tested by
-looking for a trailing / in the path.  If a trailing / exists, then
-the URL is considered to point to a directory, otherwise it is a
-file.
+The distinction between files and directories in a URI is tested by
+looking for a trailing / in the path.  If a trailing / exists, then the
+URI is considered to point to a directory, otherwise it is a file.
 
 All of the following subroutines are exported to the users namespace
-automatically.  If you do not want this, then I<require> this
-package instead of I<use>ing it.
+automatically.  If you do not want this, then I<require> this package
+instead of I<use>ing it.
 
 =head1 SUBROUTINES
 
 =over 4
 
-=item B<get_urls> I<url> [I<url> [I<url> ...]]
+=item B<get_urls> I<uri> [I<uri> [I<uri> ...]]
 
-The I<get_urls> function will fetch the documents identified by the given
-URLs and returns a list of I<HTTP::Response>s.  You can test if the GET
-succeeded by using the I<HTTP::Response> I<is_success> method.  If
-I<is_success> returns 1, then use the I<content> method to get the
-contents of the GET.  
+The I<get_urls> function will fetch the documents identified by the
+given URIs and returns a list of I<HTTP::Response>s.  You can test if
+the GET succeeded by using the I<HTTP::Response> I<is_success> method.
+If I<is_success> returns 1, then use the I<content> method to get the
+contents of the GET.
 
-Geturls performs the GETs in parallel to speed execution and should be
+Get_urls performs the GETs in parallel to speed execution and should be
 faster than performing individual gets.
 
-Example printing the success and the content from each URL:
+Example printing the success and the content from each URI:
 
-    my @urls = ('http://perl.com/', 'file:/home/me/.sig');
-    my @response = get_urls(@urls);
+    my @uris = ('http://perl.com/', 'file:/home/me/.sig');
+    my @response = get_urls(@uris);
     foreach my $res (@response) {
-      print "FOR URL ", $res->request->url;
+      print "FOR URL ", $res->request->uri;
       if ($res->is_success) {
         print "SUCCESS.  CONTENT IS\n", $res->content, "\n";
       }
@@ -835,29 +920,29 @@ Example printing the success and the content from each URL:
       }
     }
 
-=item B<put_urls> I<string> I<url> [I<url> [I<url> ...]]
+=item B<put_urls> I<string> I<uri> [I<uri> [I<uri> ...]]
 
-=item B<put_urls> I<coderef> I<url> [I<url> [I<url> ...]]
+=item B<put_urls> I<coderef> I<uri> [I<uri> [I<uri> ...]]
 
 Put the contents of I<string> or the return from &I<coderef>() into the
-listed I<url>s.  The destination I<url>s must be either ftp: or file:
+listed I<uri>s.  The destination I<uri>s must be either ftp: or file:
 and must specify a complete file; no directories are allowed.  If the
 first form is used with I<string> then the contents of I<string> will
-be sent.  If the second form is used, then I<coderef> is a reference to
-a subroutine or anonymous CODE and &I<coderef>() will be called
+be sent.  If the second form is used, then I<coderef> is a reference
+to a subroutine or anonymous CODE and &I<coderef>() will be called
 repeatedly until it returns '' or undef and all of the text it returns
-will be stored in the I<url>s.
+will be stored in the I<uri>s.
 
 Upon return, I<put_urls> returns an array, where each element contains
 a I<HTTP::Response> object corresponding to the success or failure of
-transferring the data to the i-th I<url>.  This object can be tested
-for the success or failure of the PUT by using the I<is_success> method
-on the element.  If the PUT was not successful, then the I<message>
-method may be used to gather an error message explaining why the PUT
-failed.  If there is invalid input to I<put_urls> then I<put_urls>
-returns an empty list in a list context, an undefined value in a scalar
-context, or nothing in a void context, and $@ contains a message
-containing explaining the invalid input.
+transferring the data to the i-th I<uri>.  This object can be tested for
+the success or failure of the PUT by using the I<is_success> method on
+the element.  If the PUT was not successful, then the I<message> method
+may be used to gather an error message explaining why the PUT failed.
+If there is invalid input to I<put_urls> then I<put_urls> returns an
+empty list in a list context, an undefined value in a scalar context,
+or nothing in a void context, and $@ contains a message containing
+explaining the invalid input.
 
 For example, the following code, prints either YES or NO and a failure
 message if the put failed.
@@ -867,7 +952,7 @@ message if the put failed.
                   'file://some.other.host/test',
                   'ftp://ftp.gps.caltech.edu/test');
     foreach $put_res (@a) {
-      print $put_res->request->url, ' ';
+      print $put_res->request->uri, ' ';
       if ($put_res->is_success) {
         print "YES\n";
       }
@@ -876,62 +961,62 @@ message if the put failed.
       }
     }
 
-=item B<copy_url> I<url_from> I<url_to> [I<base>]
+=item B<copy_url> I<uri_from> I<uri_to> [I<base>]
 
-Copy the content contained in the URL I<url_from> to the location specified
-by the URL I<url_to>.  I<url_from> must contain the complete path to a file;
-no directories are allowed.  I<url_to> must be a file: or ftp: URL and may
-either be a directory or a file.
+Copy the content contained in the URI I<uri_from> to the location
+specified by the URI I<uri_to>.  I<uri_from> must contain the complete
+path to a file; no directories are allowed.  I<uri_to> must be a file:
+or ftp: URI and may either be a directory or a file.
 
-If supplied, I<base> may be used to convert I<url_from> and I<rurl_to>
-from relative URLs to absolute URLs.
+If supplied, I<base> may be used to convert I<uri_from> and I<uri_to>
+from relative URIs to absolute URIs.
 
 On return, I<copy_url> returns 1 on success, 0 on otherwise.  On failure
-$@ contains a message explaining the failure.  See L<copy_urls> if you
+$@ contains a message explaining the failure.  See B<copy_urls> if you
 want to quickly copy a single file to multiple places or copy multiple
-files to one directory or both.  L<copy_urls> provides simultaneous file
-transfers and will do the task much faster than calling I<copy_url>
-many times over.  If invalid input is given to I<copy_url>, then it
-returns an empty list in a list context, an undefined value in a scalar
-context, or nothing in a void context and $@ contains a message
-explaining the invalid input.
+files to one directory or both.  B<copy_urls> provides simultaneous file
+transfers and will do the task much faster than calling I<copy_url> many
+times over.  If invalid input is given to I<copy_url>, then it returns
+an empty list in a list context, an undefined value in a scalar context,
+or nothing in a void context and $@ contains a message explaining the
+invalid input.
 
-=item B<copy_urls> I<url_file_from> I<url_file_to> [I<base>]
+=item B<copy_urls> I<uri_file_from> I<uri_file_to> [I<base>]
 
-=item B<copy_urls> I<url_file_from> I<url_dir_to> [I<base>]
+=item B<copy_urls> I<uri_file_from> I<uri_dir_to> [I<base>]
 
-Copy the content contained at the specified URLs to other locations also
-specified by URLs.  The first argument to I<copy_urls> is either a single
-URL or a reference to an array of URLs to copy.  All of these URLs must
-contain the complete path to a file; no directories are allowed.  The
-second argument may be a single URL or a reference to an array of URLS.
-If any of the destination URLs are a location of a file and not a
-directory, then only one URL can be passed as the first argument.  If
-a reference to an array of URLs is passed as the second argument, then
-all URLs must point to directories, not files.  Only file: and ftp: URLs
-may be used as the destination of the copy.
+Copy the content contained at the specified URIs to other locations
+also specified by URIs.  The first argument to I<copy_urls> is either a
+single URI or a reference to an array of URIs to copy.  All of these URIs
+must contain the complete path to a file; no directories are allowed.
+The second argument may be a single URI or a reference to an array
+of URIS.  If any of the destination URIs are a location of a file and
+not a directory, then only one URI can be passed as the first argument.
+If a reference to an array of URIs is passed as the second argument,
+then all URIs must point to directories, not files.  Only file: and ftp:
+URIs may be used as the destination of the copy.
 
-If supplied, I<base> may be used to convert relative URLs to absolute URLs
-for all URLs supplied to I<copy_urls>.
+If supplied, I<base> may be used to convert relative URIs to absolute
+URIs for all URIs supplied to I<copy_urls>.
 
-The copy operations of the multiple URLs are done in parallel to speed
+The copy operations of the multiple URIs are done in parallel to speed
 execution.
 
 On return I<copy_urls> returns a list of the I<LWP::Response> from each
-GET performed on the from URLs.  If there is invalid input to I<copy_urls>
+GET performed on the from URIs.  If there is invalid input to I<copy_urls>
 then I<copy_urls> returns an empty list in a list context, an undefined
 value in a scalar context, or nothing in a void context and contains $@
 a message explaining the error.  The success or failure of each GET may
-be tested by using I<is_success> method on each element of the list.  If
-the GET succeeded (I<is_success> returns TRUE), then hash element
-I<'put_requests'> exists and is a reference to a list of
-I<LWP::Response>s containing the response to the PUT.  For example, the
-following code prints a message containing the results from I<copy_urls>:
+be tested by using I<is_success> method on each element of the list.
+If the GET succeeded (I<is_success> returns TRUE), then hash element
+I<'put_requests'> exists and is a reference to a list of I<LWP::Response>s
+containing the response to the PUT.  For example, the following code
+prints a message containing the results from I<copy_urls>:
 
     my @get_res = copy_urls(......);
     foreach my $get_res (@get_res) {
-      my $url = $get_res->request->url;
-      print "GET from $url ";
+      my $uri = $get_res->request->uri;
+      print "GET from $uri ";
       unless ($get_res->is_success) {
         print "FAILED\n";
         next;
@@ -939,57 +1024,57 @@ following code prints a message containing the results from I<copy_urls>:
   
       print "SUCCEEDED\n";
       foreach my $c (@{$get_res->{put_requests}}) {
-        $url = $c->request->url;
+        $uri = $c->request->uri;
         if ($c->is_success) {
-          print "    to $url succeeded\n"
+          print "    to $uri succeeded\n"
         }
         else {
-          print "    to $url failed: ", $c->message, "\n";
+          print "    to $uri failed: ", $c->message, "\n";
         }
       }
     }
 
-=item B<delete_urls> I<url> [I<url> [I<url> ...]]
+=item B<delete_urls> I<uri> [I<uri> [I<uri> ...]]
 
-Delete the files located by the I<url>s and return a I<HTTP::Response>
-for each I<url>.  If the I<url> was successfully deleted, then the 
+Delete the files located by the I<uri>s and return a I<HTTP::Response>
+for each I<uri>.  If the I<uri> was successfully deleted, then the
 I<is_success> method returns 1, otherwise it returns 0 and the I<message>
 method contains the reason for the failure.
 
-=item B<move_url> I<from> I<to> [I<base>]
+=item B<move_url> I<from_uri> I<to_uri> [I<base>]
 
-Move the contents of the I<from> URL to the I<to> URL.  If I<base> is
-supplied, then the I<from> and I<to> URLs are converted from relative
-URLs to absolute URLs using I<base>.  If the move was successful, then
-I<move_url> returns 1, otherwise it returns 0 and $@ contains a message
-explaining why the move failed.  If invalid input was given to I<move_url>
-then it returns an empty list in a list context, an undefined value in
-a scalar context, or nothing in a void context and $@ contains a message
-explaining the invalid input.
+Move the contents of the I<from_uri> URI to the I<to_uri> URI.  If I<base>
+is supplied, then the I<from_uri> and I<to_uri> URIs are converted
+from relative URIs to absolute URIs using I<base>.  If the move was
+successful, then I<move_url> returns 1, otherwise it returns 0 and $@
+contains a message explaining why the move failed.  If invalid input was
+given to I<move_url> then it returns an empty list in a list context,
+an undefined value in a scalar context, or nothing in a void context
+and $@ contains a message explaining the invalid input.
 
-=item B<list_url> I<url>
+=item B<list_url> I<uri>
 
-Return a list containing the filenames in the directory located at I<url>.
-Only file and FTP directory URLs currently work.  If for any reason the
-list can not be obtained, then I<list_url> returns an empty list in a list
-context, an undefined value in a scalar context, or nothing in a void
-context and $@ contains a message why I<list_url> failed.
+Return a list containing the filenames in the directory located at I<uri>.
+Only file and FTP directory URIs currently work.  If for any reason the
+list can not be obtained, then I<list_url> returns an empty list in a
+list context, an undefined value in a scalar context, or nothing in a
+void context and $@ contains a message why I<list_url> failed.
 
 =back 4
 
 =head1 SEE ALSO
 
-See also the L<HTTP::Response>, L<HTTP::Request>, and L<LWP::Simple>
-manual pages.
+See also the L<HTTP::Response>, L<HTTP::Request>, L<LWP::Request>,
+and L<LWP::Simple>.
 
 =head1 AUTHOR
 
-Blair Zajac <blair@gps.caltech.edu>
+Blair Zajac <bzajac@geostaff.com>
 
 =head1 COPYRIGHT
 
 Copyright (c) 1998 by Blair Zajac.  All rights reserved.  This package
-is free software; you can redistribute it and/or modify it under the same
-terms as Perl itself.
+is free software; you can redistribute it and/or modify it under the
+same terms as Perl itself.
 
 =cut

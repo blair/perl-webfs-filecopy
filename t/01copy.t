@@ -4,7 +4,7 @@
 use strict;
 use vars qw($loaded);
 
-BEGIN { $| = 1; print "1..179\n"; }
+BEGIN { $| = 1; print "1..187\n"; }
 END   { print "not ok 1\n" unless $loaded; }
 
 my $ok_count = 1;
@@ -59,20 +59,20 @@ ok( $@ eq 'Cannot copy directories: file:/tmp/' );			#  9
 ok( !copy_url('http://www.gps.caltech.edu/', 'http://ftp/') );		# 10
 ok( $@ eq 'Can only copy to file or FTP URLs: http://ftp/' );		# 11
 
-# Put together file URLs for the test files.  Files 1, 2, and 3, 5 exists and
+# Put together file URIs for the test files.  Files 1, 2, and 3, 5 exists and
 # file 4 doesn't.
 my $cwd = cwd;
 my @from_files = qw(file1 file2 file3 file4 file5);
-my @from_urls  = map { URI::file->new_abs($_) } @from_files;
-my @to_urls    = map { WebFS::FileCopy::_fix_url("$_.new") } @from_urls;
+my @from_uris  = map { URI::file->new_abs($_) } @from_files;
+my @to_uris    = map { WebFS::FileCopy::_create_uri("$_.new") } @from_uris;
 
 # Clean up any output files from previous testing runs.
-unlink(map { $_->file } @to_urls);
+unlink(map { $_->file } @to_uris);
 
 # Test the get_urls.
-my @a = get_urls(@from_urls);
+my @a = get_urls(@from_uris);
 
-ok( @a == @from_urls );							# 12
+ok( @a == @from_uris );							# 12
 ok( $a[0] );								# 13
 ok( $a[1] );								# 14
 ok( $a[2] );								# 15
@@ -87,7 +87,7 @@ ok(  $a[4]->is_success and length($a[4]->content) == 11683 );		# 22
 
 # Try to put the files.
 my $content = $a[4]->content;
-my @b = put_urls($content, @to_urls, 'file:/this/path/should/not/exist');
+my @b = put_urls($content, @to_uris, 'file:/this/path/should/not/exist');
 ok(  @b == @from_files+1 );						# 23
 ok(  $b[0] );								# 24
 ok(  $b[1] );								# 25
@@ -104,7 +104,7 @@ ok( !$b[5]->is_success );						# 35
 ok(  $b[5]->message eq "No such file or directory" );			# 36
 
 # Try to get the same files we just put.
-my @c = get_urls(@to_urls);
+my @c = get_urls(@to_uris);
 ok( @c == @from_files );						# 37
 ok( $a[4] );								# 38
 ok( $a[4]->content eq $c[0]->content );					# 39
@@ -121,7 +121,7 @@ sub put_test {
   substr($put_string, $i++, 1);
 }
 
-@b = put_urls(\&put_test, 'file:/this/path/should/not/exist', @to_urls);
+@b = put_urls(\&put_test, 'file:/this/path/should/not/exist', @to_uris);
 ok( @b == @from_files+1 );						# 44
 ok(  $b[0] );								# 45
 ok(  $b[1] );								# 46
@@ -138,7 +138,7 @@ ok(  $b[4]->is_success );						# 56
 ok(  $b[5]->is_success );						# 57
 
 # Try to get the same files we just put.
-@b = get_urls(@to_urls);
+@b = get_urls(@to_uris);
 ok( @b == @from_files );						# 58
 ok( $a[2] );								# 59
 ok( $b[0] );								# 60
@@ -186,14 +186,12 @@ ok( !$b[1]->is_success );						# 87
 ok(  $b[1]->message eq "Use ftp instead" );				# 88
 ok( !$b[2]->is_success );						# 89
 ok(  $b[2]->message eq "/test: Permission denied. (Delete)" );		# 90
-#print STDERR Dumper($b[2]), "\n";
-#print STDERR $b[2]->message, "\n";
 ok( !$b[3]->is_success );						# 91
 ok(  $b[3]->message eq "Missing URL in request" );			# 92
 
 # Try to delete the files we created.
-@b = delete_urls(@to_urls);
-ok( @b == @to_urls );							# 93
+@b = delete_urls(@to_uris);
+ok( @b == @to_uris );							# 93
 ok( $b[0] );								# 94
 ok( $b[1] );								# 95
 ok( $b[2] );								# 96
@@ -206,8 +204,8 @@ ok( $b[3]->is_success );						# 102
 ok( $b[4]->is_success );						# 103
 
 # Try to delete the files again.  This time it should fail.
-@b = delete_urls(@to_urls);
-ok(  @b == @to_urls );							# 104
+@b = delete_urls(@to_uris);
+ok(  @b == @to_uris );							# 104
 ok(  $b[0] );								# 105
 ok(  $b[1] );								# 106
 ok(  $b[2] );								# 107
@@ -220,16 +218,16 @@ ok( !$b[3]->is_success );						# 113
 ok( !$b[4]->is_success );						# 114
 
 # Create one file and try to move it.
-ok( copy_url($from_urls[4], $to_urls[4]) );				# 115
-ok( move_url($to_urls[4], $to_urls[0]) );				# 116
+ok( copy_url($from_uris[4], $to_uris[4]) );				# 115
+ok( move_url($to_uris[4], $to_uris[0]) );				# 116
 
 # Now try failures of move_url.
-ok( !move_url($to_urls[4], $to_urls[0]) );				# 117
+ok( !move_url($to_uris[4], $to_uris[0]) );				# 117
 ok( $@ =~ m?/t/file5.new: No such file or directory? );			# 118
-ok( !move_url($to_urls[0], 'file://some.other.host/test') );		# 119
+ok( !move_url($to_uris[0], 'file://some.other.host/test') );		# 119
 ok( $@ eq 'PUT file://some.other.host/test: Only file://localhost/ allowed' ); # 120
 
-# Make sure that if empty URLs are passed, we get the proper return message.
+# Make sure that if empty URIs are passed, we get the proper return message.
 ok( !copy_url(' ', ' ') );						# 121
 ok( $@ eq 'Missing GET URL' );						# 122
 ok( !copy_url('http://www.perl.com/', ' ') );				# 123
@@ -263,7 +261,7 @@ ok( !$b[0]->is_success );						# 139
 ok(  $b[0]->message eq 'Missing URL in request' );			# 140
 
 # Test copy_urls.
-@b = copy_urls(['', $from_urls[0]], [@to_urls, '', 'file:/no/such/path/ZZZ/']);
+@b = copy_urls(['', $from_uris[0]], [@to_uris, '', 'file:/no/such/path/ZZZ/']);
 ok( @b );								# 141
 ok(  $b[0] );								# 142
 ok(  $b[1] );								# 143
@@ -281,7 +279,7 @@ ok( !$b[1]->{put_requests}[6]->is_success );				# 154
 ok(  $b[1]->{put_requests}[6]->message eq 'No such file or directory' ); # 155
 
 # Try to read all of the files we put and compare with what we've read.
-@b = get_urls(@to_urls);
+@b = get_urls(@to_uris);
 ok( @b == @from_files );						# 156
 ok( $b[0] );								# 157
 ok( $b[1] );								# 158
@@ -299,19 +297,38 @@ ok( !list_url );							# 167
 ok( !list_url('http://www.perl.com/') );				# 168
 ok( $@ eq 'Unsupported scheme http in URL http://www.perl.com/' );	# 169
 @b = list_url("file://localhost/$cwd");
-ok( @b == 12 );								# 170
+ok( @b == 13 );								# 170
 ok( !list_url('file://localhost/this/path/should/not/exist') );		# 171
 # This case insensitive match is done to match on both Unix and Windows.
- #          File or directory `/this/path/should/not/exist' does not exist
+#           File or directory `/this/path/should/not/exist' does not exist
 ok( $@ =~ m:File or directory `.this.path.should.not.exist' does not exist:i ); # 172
-ok( !list_url($from_urls[0]) );						# 173
+ok( !list_url($from_uris[0]) );						# 173
 ok( $@ =~ m:t.file1' is not a directory:i );				# 174
 ok( !list_url('ftp://ftp.gps.caltech.edu/ZZZZ') );			# 175
 ok( $@ = "Cannot chdir to `ZZZ'" );					# 176
 @b = list_url("ftp://ftp.gps.caltech.edu/");
 ok( @b == 8 );								# 177
 
+# Try one function with a HTTP::Request object.  Because we are doing
+# a GET on a object but passing in a request with a DELETE method,
+# get_urls should make a clone, change the method and leave the initial
+# request alone.
+my $http_req = HTTP::Request->new('DELETE', $from_uris[0]);
+ok( $http_req and $http_req->method eq 'DELETE' );			# 178
+@b = get_urls($http_req);
+ok( @b == 1);								# 179
+ok( $b[0] and $b[0]->is_success and length($b[0]->content) == 90 );	# 180
+ok( $http_req and $http_req->method eq 'DELETE' );			# 181
+
+# Try copying a file from a subdirectory into the current directory.
+# This also tests the name appending code for copying a file into a
+# directory.
+ok( copy_url('file:dir/file6', "file://localhost/$cwd/") );		# 182
+ok( -e 'file6' );							# 183
+ok( -s _ == 90 );							# 184
+ok( unlink('file6') );							# 185
+
 # Clean up the output files.
-ok( unlink(map { $_->file } @to_urls) == @from_files );			# 178
+ok( unlink(map { $_->file } @to_uris) == @from_files );			# 186
 @b = list_url("file://localhost/$cwd");
-ok( @b == 7 );								# 179
+ok( @b == 8 );								# 187

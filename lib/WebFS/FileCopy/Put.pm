@@ -7,14 +7,13 @@ use Exporter;
 require WebFS::FileCopy::Put::File;
 require WebFS::FileCopy::Put::FTP;
 
-use vars qw($VERSION @ISA);
+use vars qw(@ISA $VERSION);
 
-$VERSION = do {my @r=(q$Revision: 1.00 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
 @ISA     = qw(Exporter); 
+$VERSION = do {my @r=(q$Revision: 1.00 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
  
-sub new { 
-  my $class = shift;
-  my $req   = shift;
+sub new {
+  my ($class, $req) = @_;
 
   unless (ref($req) eq 'LWP::Request') {
     $@ = LWP::Request->new(400, "WebFS::FileCopy::Put given invalid request");
@@ -24,26 +23,33 @@ sub new {
   # We put this in so that give_response can be used.
   $req->{done_cb} = sub { $_[0]; };
 
-  # Check that we have a URL.
-  my $url = $req->url;
-  unless ($url) {
+  # Check that we have a URI.
+  my $uri = $req->uri;
+  unless ($uri) {
     $@ = $req->give_response(400, 'Missing URL in request');
     return;
   }
 
-  my $scheme = $url->scheme;
+  my $scheme = $uri->scheme;
   if ($scheme eq 'ftp') {
-    WebFS::FileCopy::Put::FTP->new($req);
+    return WebFS::FileCopy::Put::FTP->new($req);
   } 
   elsif ($scheme eq 'file') {
-    WebFS::FileCopy::Put::File->new($req);
+    return WebFS::FileCopy::Put::File->new($req);
   }
   else {
     $@ = $req->give_response(500,
 			     "WebFS::FileCopy::Put invalid scheme $scheme");
     return; 
-  } 
-} 
+  }
+}
+
+sub DESTROY {
+  if ($WebFS::FileCopy::WARN_DESTROY) {
+    my $self = shift;
+    print STDERR "DESTROYing $self\n";
+  }
+}
 
 1;
 
@@ -53,7 +59,7 @@ __END__
 
 =head1 NAME
 
-WebFS::FileCopy::Put - Object for putting data to either file or ftp URL
+WebFS::FileCopy::Put - Object for putting data to either file or ftp URI
 
 =head1 SYNOPSIS
 
@@ -105,7 +111,7 @@ See also the L<WebFS::FileCopy> and L<LWP::Simple> manual pages.
 
 =head1 AUTHOR
 
-Blair Zajac <blair@gps.caltech.edu>
+Blair Zajac <bzajac@geostaff.com>
 
 =head1 COPYRIGHT
 

@@ -6,25 +6,23 @@ use strict;
 use Exporter;
 use Carp qw(cluck);
 
-use vars qw($VERSION @ISA);
+use vars qw(@ISA $VERSION);
 
-$VERSION = do {my @r=(q$Revision: 1.00 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
 @ISA     = qw(Exporter);
+$VERSION = do {my @r=(q$Revision: 1.01 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
 
 sub new {
-  my $class = shift;
-  my $req   = shift;
+  my ($class, $req) = @_;
 
-  my $url   = $req->url;
-
-  my $scheme = $url->scheme;
+  my $uri   = $req->uri;
+  my $scheme = $uri->scheme;
   unless ($scheme eq 'file') {
     $@ = $req->give_response(500,
 			     "WebFS::FileCopy::Put::File invalid scheme $scheme");
     return;
   }
 
-  my $host = $url->host;
+  my $host = $uri->host;
   if ($host and $host !~ /^localhost$/i) {
     $@ = $req->give_response(400, 'Only file://localhost/ allowed');
     return;
@@ -32,7 +30,7 @@ sub new {
 
   # Open the file.
   local *FH;
-  open(FH, '>' . $url->file) or do {
+  open(FH, '>' . $uri->file) or do {
     $@ = $req->give_response(401, "$!");
     return;
   };
@@ -42,12 +40,8 @@ sub new {
 }
 
 sub print {
-  my $self   = shift;
-  my $buffer = shift;
-
-  return unless defined($buffer);
-
-  print {$self->{handle}} $buffer;
+  return unless defined($_[1]);
+  print {$_[0]->{handle}} $_[1];
 }
 
 sub close {
@@ -55,6 +49,13 @@ sub close {
 
   my $ret = close($self->{handle});
   $self->{req}->give_response($ret ? 201 : 500);
+}
+
+sub DESTROY {
+  if ($WebFS::FileCopy::WARN_DESTROY) {
+    my $self = shift;
+    print STDERR "DESTROYing $self\n";
+  }
 }
 
 1;

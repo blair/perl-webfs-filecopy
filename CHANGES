@@ -1,3 +1,32 @@
+Mon Jul  5 11:34:24 PDT 1999
+
+	Object destruction was not occurring of LWP::Request objects since
+	the data_cb and done_cb hash elements are anonymous subroutines
+	that contained references to external objects.	Now all the
+	WebFS::FileCopy subroutines delete these hash elements and object
+	destruction occurs normally.
+
+	Add some debugging code to the modules.  If
+	$WebFS::FileCopy::WARN_DESTROY is true, then upon destruction
+	some modules will now print a message that they were destructed.
+
+	Add a test to check the filename to directory appending code
+	in copy_urls.
+
+Fri Jul  2 22:00:01 PDT 1999
+
+	Allow HTTP::Request and LWP::Request's to be passed to all
+	WebFS::FileCopy subroutines.  This allows authentication to
+	be included in a HTTP::Request to log into private portions of
+	web sites.
+
+	Do a lot of internal renaming of URL to URI.
+
+Mon Jun 28 16:19:44 PDT 1999
+
+	Fix a typo in Makefile.PL as noted by Roland Bauer
+	<roland.bauer@fff.at>.
+
 Tue Apr 13 09:29:13 PDT 1999 <bzajac@geostaff.com> (Blair Zajac)
 
 	Update the module to use URI instead of URI::URL.  Check for

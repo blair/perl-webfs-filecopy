@@ -63,7 +63,7 @@ check_version('LWP::Version' => '0.24') or
 check_version('URI' => '1.02') or
   warn   "\n"
        . "*** For WebFS::FileCopy you require version 1.02, or later, of\n"
-       . "    LWP::Version from CPAN/authors/id/GAAS/URI-x.x.tar.gz.\n\n";
+       . "    URI from CPAN/authors/id/GAAS/URI-x.x.tar.gz.\n\n";
 
 WriteMakefile(
   'NAME'	 => 'WebFS::FileCopy',
