@@ -27,7 +27,7 @@ use vars qw(@EXPORT @ISA $VERSION $ua $WARN_DESTROY);
 @EXPORT  = qw(&copy_url &copy_urls &delete_urls &get_urls &list_url
 	      &move_url &put_urls);
 @ISA     = qw(Exporter);
-$VERSION = substr q$Revision: 1.03 $, 10;
+$VERSION = substr q$Revision: 1.04 $, 10;
 
 # To allow debugging of object destruction, setting WARN_DESTORY to 1
 # till have DESTROY methods print a message when a object is destroyed.

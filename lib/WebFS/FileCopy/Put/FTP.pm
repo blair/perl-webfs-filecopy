@@ -14,7 +14,7 @@ use Net::FTP;
 use vars qw(@ISA $VERSION);
 
 @ISA     = qw(Exporter);
-$VERSION = substr q$Revision: 1.03 $, 10;
+$VERSION = substr q$Revision: 1.04 $, 10;
 
 sub new {
   my ($class, $req) = @_;

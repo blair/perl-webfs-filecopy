@@ -1,4 +1,4 @@
-Package WebFS::FileCopy version 1.03
+Package WebFS::FileCopy version 1.04
 
 This is the WebFS::FileCopy package.  This module provides subroutines
 for the getting, putting, copying, moving and deleting of files
