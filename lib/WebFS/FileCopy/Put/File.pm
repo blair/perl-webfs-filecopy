@@ -9,12 +9,12 @@ use Carp qw(cluck);
 use vars qw(@ISA $VERSION);
 
 @ISA     = qw(Exporter);
-$VERSION = do {my @r=(q$Revision: 1.01 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = substr q$Revision: 1.02 $, 10;
 
 sub new {
   my ($class, $req) = @_;
 
-  my $uri   = $req->uri;
+  my $uri    = $req->uri;
   my $scheme = $uri->scheme;
   unless ($scheme eq 'file') {
     $@ = $req->give_response(500,
@@ -35,8 +35,11 @@ sub new {
     return;
   };
 
-  my $self = bless {'req' => $req, 'handle' => *FH}, $class;
-  $self;
+  # Make sure the file is in binary mode, otherwise copies of binary
+  # files on Windows will not work.
+  binmode(*FH);
+
+  bless {'req' => $req, 'handle' => *FH}, $class;
 }
 
 sub print {

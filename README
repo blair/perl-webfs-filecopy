@@ -1,10 +1,11 @@
-Package WebFS::FileCopy version 1.01
+Package WebFS::FileCopy version 1.02
 
 This is the WebFS::FileCopy package.  This module provides subroutines
-for the getting, putting, copying, moving and deleting of files located by
-URIs.  It also supports listing directories identified by URI.  Currently,
-files for getting can use any URI protocol, such as file, FTP, HTTP, etc.
-For putting, only the file and FTP protocols are currently supported.
+for the getting, putting, copying, moving and deleting of files
+located by URIs.  It also supports listing directories identified by
+URI.  Currently, files for getting can use any URI protocol, such as
+file, FTP, HTTP, etc.  For putting, only the file and FTP protocols
+are currently supported.
 
 Notable features:
 
@@ -25,10 +26,10 @@ Notable features:
 
 WARNING
 
-This package is based on Gisle Aas's LWPng-alpha module, which is still
-alpha code.  Because the LWPng interface may change in the future, this
-module may break if LWPng is updated in the future without updating
-WebFS::FileCopy.
+This package is based on Gisle Aas's LWPng-alpha module, which is
+still alpha code.  Because the LWPng interface may change in the
+future, this module may break if LWPng is updated in the future
+without updating WebFS::FileCopy.
 
 REQUIREMENTS
 
@@ -36,19 +37,19 @@ REQUIREMENTS
 
    * LWPng-alpha 0.24 or greater.
 
-   * URI 1.02 or greater.
+   * URI 1.09 or greater.
 
-   * Net::FTP 2.33 or greater.
+   * Net::FTP 2.56 or greater.
 
 SUPPORTED PLATFORMS
 
-I have built and tested the WebFS::FileCopy package on both Solaris and
-Windows NT machines.
+I have built and tested the WebFS::FileCopy package on both Solaris
+and Windows NT machines.
 
 AVAILABILITY
 
-The latest version of this package is available for download from a CPAN
-(Comprehensive Perl Archive Network) site near your at
+The latest version of this package is available for download from a
+CPAN (Comprehensive Perl Archive Network) site near your at
 
     http://www.perl.com/CPAN/authors/id/B/BZ/BZAJAC/
 
@@ -62,8 +63,8 @@ In order to use this package you will need Perl version 5.004_04 or
 better.
 
 You will need a LWPng-alpha version 0.24 or greater.  Versions older
-than this one will not work with WebFS::FileCopy.  Get LWPng-alpha from
-CPAN as CPAN/authors/id/GAAS/LWPng-alpha-?.??.tar.gz.
+than this one will not work with WebFS::FileCopy.  Get LWPng-alpha
+from CPAN as CPAN/authors/id/G/GA/GAAS/LWPng-alpha-?.??.tar.gz.
 
 If you do not have Net::FTP installed, use CPAN to install Net::FTP.
 
@@ -76,18 +77,18 @@ something like this command:
 DOCUMENTATION
 
 See the CHANGES file for a list of recent changes.  POD style
-documentation is included in all modules and scripts.  These are normally
-converted to manual pages end installed as part of the "make install"
-process.  You should also be able to use the 'perldoc' utility to extract
-documentation from the module files directly.
+documentation is included in all modules and scripts.  These are
+normally converted to manual pages end installed as part of the "make
+install" process.  You should also be able to use the 'perldoc'
+utility to extract documentation from the module files directly.
 
 AUTHOR, COMMENTS AND BUGS
 
 I welcome all comments and bug reports.  Please email them to Blair
-Zajac <blair@geostaff.com>.
+Zajac <blair@akamai.com>.
 
 COPYRIGHT
 
-Copyright (c) 1998, 1999 Blair Zajac.  All rights reserved.  This
-package is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
+Copyright (c) 1998, 1999, 2000 Blair Zajac.  All rights reserved.
+This package is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.

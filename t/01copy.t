@@ -181,7 +181,7 @@ ok( $b[0] );								# 82
 ok( $b[1] );								# 83
 ok( $b[2] );								# 84
 ok( !$b[0]->is_success );						# 85
-ok(  $b[0]->message eq "File Not Found" );				# 86
+ok(  $b[0]->message eq "Not Found" );					# 86
 ok( !$b[1]->is_success );						# 87
 ok(  $b[1]->message eq "Use ftp instead" );				# 88
 ok( !$b[2]->is_success );						# 89

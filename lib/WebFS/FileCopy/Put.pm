@@ -10,7 +10,7 @@ require WebFS::FileCopy::Put::FTP;
 use vars qw(@ISA $VERSION);
 
 @ISA     = qw(Exporter); 
-$VERSION = do {my @r=(q$Revision: 1.00 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = substr q$Revision: 1.02 $, 10;
  
 sub new {
   my ($class, $req) = @_;
@@ -33,11 +33,9 @@ sub new {
   my $scheme = $uri->scheme;
   if ($scheme eq 'ftp') {
     return WebFS::FileCopy::Put::FTP->new($req);
-  } 
-  elsif ($scheme eq 'file') {
+  } elsif ($scheme eq 'file') {
     return WebFS::FileCopy::Put::File->new($req);
-  }
-  else {
+  } else {
     $@ = $req->give_response(500,
 			     "WebFS::FileCopy::Put invalid scheme $scheme");
     return; 
@@ -71,8 +69,7 @@ WebFS::FileCopy::Put - Object for putting data to either file or ftp URI
    $put->print "Content goes here\n";
    my $res = $put->close;
    print $res->as_string, "\n";
- }
- else {
+ } else {
    my $res = $@;
    print $res->message, "\n";
  }
@@ -111,7 +108,7 @@ See also the L<WebFS::FileCopy> and L<LWP::Simple> manual pages.
 
 =head1 AUTHOR
 
-Blair Zajac <bzajac@geostaff.com>
+Blair Zajac <blair@akamai.com>
 
 =head1 COPYRIGHT
 

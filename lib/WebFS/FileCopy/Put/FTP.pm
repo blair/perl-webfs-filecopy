@@ -10,7 +10,7 @@ use Net::FTP;
 use vars qw(@ISA $VERSION);
 
 @ISA     = qw(Exporter);
-$VERSION = do {my @r=(q$Revision: 1.01 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = substr q$Revision: 1.02 $, 10;
 
 sub new {
   my ($class, $req) = @_;
@@ -18,7 +18,7 @@ sub new {
   my $ftp = WebFS::FileCopy::_open_ftp_connection($req) or return;
 
   # Get and fix path.
-  my $uri = $req->uri;
+  my $uri  = $req->uri;
   my @path = $uri->path_segments;
   # There will always be an empty first component.
   shift(@path);

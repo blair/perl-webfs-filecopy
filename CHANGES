@@ -1,3 +1,40 @@
+Thu Nov  2 11:00:13 PST 2000
+
+	Release version 1.02.
+
+Thu Nov  2 10:44:11 PST 2000
+
+	Require and use the latest versions of all the HTTP related
+	Perl modules, since the error messages from the modules appear
+	to have changed and this will make sure that the test scripts
+	in the test directory pass.  This means using the following
+	new modules:
+
+	    Net::FTP 2.56
+	    LWPng 0.24
+	    LWP 5.48
+	    URI 1.09
+
+Thu Nov  2 10:25:34 PST 2000
+
+	Change all of the email addresses in all of the documentation
+	from blair@geostaff.com to blair@akamai.com.
+
+	In WebFS::FileCopy::Put::File, when opening the output file
+	call binmode() on the file handle so that binary files are
+	properly written on Windows operating systems.
+
+	When opening a FTP connection to put a file on the FTP server,
+	no longer set default values for the username, password and
+	account in WebFS::FileCopy::_open_ftp_connection and instead
+	let the Net::FTP module set these since it has some code to
+	handle FTP proxy's.  In particular, having
+	WebFS::FileCopy::_open_ftp_connection set the account value to
+	`home' if the account value was not previously set would cause
+	failures on some FTP servers since Net::FTP would always
+	attempt the ACCT command on the FTP server, which some servers
+	do not recognize and the login would fail.
+
 Mon Jul  5 11:34:24 PDT 1999
 
 	Object destruction was not occurring of LWP::Request objects since
@@ -27,7 +64,7 @@ Mon Jun 28 16:19:44 PDT 1999
 	Fix a typo in Makefile.PL as noted by Roland Bauer
 	<roland.bauer@fff.at>.
 
-Tue Apr 13 09:29:13 PDT 1999 <bzajac@geostaff.com> (Blair Zajac)
+Tue Apr 13 09:29:13 PDT 1999 <bzajac@akamai.com> (Blair Zajac)
 
 	Update the module to use URI instead of URI::URL.  Check for
 	URI 1.02 in Makefile.PL.
@@ -43,7 +80,7 @@ Tue Apr 13 09:29:13 PDT 1999 <bzajac@geostaff.com> (Blair Zajac)
 
 	Release version 1.00.
 
-Thu Apr  8 10:20:30 PDT 1999 <bzajac@geostaff.com> (Blair Zajac)
+Thu Apr  8 10:20:30 PDT 1999 <bzajac@akamai.com> (Blair Zajac)
 
 	Have ok() in t/*.t return the success or failure of the test
 	instead of the number of tests performed.

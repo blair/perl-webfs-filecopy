@@ -6,16 +6,16 @@ use strict;
 use Exporter;
 use Carp qw(croak cluck);
 use Cwd;
-use URI 1.02;
+use URI 1.09;
 use URI::file;
-use LWP::Version 0.23;
-use LWP::UA;
+use LWP::Version 0.24;
+use LWP::UA 1.30;
 use LWP::MainLoop qw(mainloop);
 use LWP::Conn::HTTP;
 use LWP::Conn::FTP;
 use LWP::Request;
-use HTTP::Request::Common qw(GET PUT);
-use Net::FTP;
+use HTTP::Request::Common 1.16 qw(GET PUT);
+use Net::FTP 2.56;
 use WebFS::FileCopy::Put;
 
 use vars qw(@EXPORT @ISA $VERSION $ua $WARN_DESTROY);
@@ -23,7 +23,7 @@ use vars qw(@EXPORT @ISA $VERSION $ua $WARN_DESTROY);
 @EXPORT  = qw(&copy_url &copy_urls &delete_urls &get_urls &list_url
 	      &move_url &put_urls);
 @ISA     = qw(Exporter);
-$VERSION = do {my @r=(q$Revision: 1.01 $=~/\d+/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = substr q$Revision: 1.02 $, 10;
 
 # To allow debugging of object destruction, setting WARN_DESTORY to 1
 # till have DESTROY methods print a message when a object is destroyed.
@@ -96,8 +96,7 @@ sub _start_transfer_request {
     if ($conn) {
       $put_connections[$i] = $conn;
       $put_res[$i]         = undef;
-    }
-    else {
+    } else {
       $put_connections[$i] = undef;
       $put_res[$i]         = $@;
     }
@@ -207,13 +206,11 @@ sub _create_uri {
     $uri = $uri->clone;
     $uri = $uri->abs($base) if defined($base) && $base;
     $uri = $uri->canonical;
-  }
-  else {
+  } else {
     my $temp = $uri;
     if (defined($base) and $base) {
       $uri = eval { URI->new_abs($uri, $base)->canonical; };
-    }
-    else {
+    } else {
       $uri = eval { URI->new($uri)->canonical; };
     }
     cluck "WebFS::FileCopy::_create_uri failed on $temp: $@" if $@;
@@ -234,8 +231,7 @@ sub _create_request {
     $uri = bless $uri->clone, 'LWP::Request';
     $uri->method($method);
     return $uri;
-  }
-  else {
+  } else {
     return LWP::Request->new($method, _create_uri($uri, $base));
   }
 }
@@ -391,8 +387,7 @@ sub put_urls {
         $conn->print($buffer);
       }
     }
-  }
-  else {
+  } else {
     foreach my $conn (@put_connections) {
       next unless $conn;
       $conn->print($string_or_code);
@@ -548,8 +543,7 @@ sub _dump {
       $uri = $c->request->uri;
       if ($c->is_success) {
         print $fd "    to $uri succeeded\n"
-      }
-      else {
+      } else {
         print $fd "    to $uri failed: ", $c->message, "\n";
       }
     }
@@ -672,13 +666,11 @@ sub move_url {
     my $ret = $ret[0];
     if ($ret->is_success) {
       return 1;
-    }
-    else {
+    } else {
       $@ = $ret->message;
       return 0;
     }
-  }
-  else {
+  } else {
     return 0;
   }
 }
@@ -774,24 +766,19 @@ sub list_url {
     return;
   }
 
-  my @listing = ();
   if ($scheme eq 'file' || $scheme eq 'ftp' ) {
     my $code = "_list_${scheme}_uri";
     no strict 'refs';
     my @listing = &$code($uri);
     if (@listing) {
       return @listing;
-    }
-    else {
+    } else {
       return;
     }
-  }
-  else {
+  } else {
     $@ = "Unsupported scheme $scheme in URL $uri";
     return;
   }
-
-  @listing;
 }
 
 # Open a FTP connection.  Return either a Net::FTP object or undef if
@@ -807,11 +794,13 @@ sub _open_ftp_connection {
     return;
   }
 
-  # Handle user authentication.
+  # Handle user authentication.  If the username, password and/or
+  # account is not set, then Net::FTP will attempt to set these
+  # properly, so there's no point in doing that here.
   my ($user, $pass) = $req->authorization_basic;
-  $user  ||= $uri->user || 'anonymous';
-  $pass  ||= $uri->password || 'nobody@';
-  my $acct = $req->header('Account') || 'home';
+  $user  ||= $uri->user;
+  $pass  ||= $uri->password;
+  my $acct = $req->header('Account');
 
   # Open the initial connection.
   my $ftp = Net::FTP->new($uri->host);
@@ -914,8 +903,7 @@ Example printing the success and the content from each URI:
       print "FOR URL ", $res->request->uri;
       if ($res->is_success) {
         print "SUCCESS.  CONTENT IS\n", $res->content, "\n";
-      }
-      else {
+      } else {
         print "FAILED BECAUSE ", $res->message, "\n";
       }
     }
@@ -955,8 +943,7 @@ message if the put failed.
       print $put_res->request->uri, ' ';
       if ($put_res->is_success) {
         print "YES\n";
-      }
-      else {
+      } else {
         print "NO ", $put_res->message, "\n";
       }
     }
@@ -1027,8 +1014,7 @@ prints a message containing the results from I<copy_urls>:
         $uri = $c->request->uri;
         if ($c->is_success) {
           print "    to $uri succeeded\n"
-        }
-        else {
+        } else {
           print "    to $uri failed: ", $c->message, "\n";
         }
       }
@@ -1069,7 +1055,7 @@ and L<LWP::Simple>.
 
 =head1 AUTHOR
 
-Blair Zajac <bzajac@geostaff.com>
+Blair Zajac <blair@akamai.com>
 
 =head1 COPYRIGHT
 
